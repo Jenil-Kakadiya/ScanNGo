@@ -6,12 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Eye, EyeOff, Mail, Lock, User, Phone } from 'lucide-react';
-import ClientOnly from '@/components/ClientOnly';
+import { Eye, EyeOff, Mail, Lock, User, Phone, Shield, Sparkles, Chrome, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function AuthPage() {
   const [isAdminMode, setIsAdminMode] = useState(false);
-  const [isUserLogin, setIsUserLogin] = useState(true); // true = login, false = register
+  const [isUserLogin, setIsUserLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -24,6 +23,7 @@ export default function AuthPage() {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -34,7 +34,6 @@ export default function AuthPage() {
 
     if (error) {
       setErrors({ general: 'Google authentication failed. Please try again.' });
-      // Clean up URL
       window.history.replaceState({}, document.title, window.location.pathname);
       return;
     }
@@ -43,29 +42,21 @@ export default function AuthPage() {
       try {
         const user = JSON.parse(decodeURIComponent(userParam));
         
-        // Store user data and token in localStorage
-        localStorage.setItem('user', JSON.stringify(user));
-        localStorage.setItem('token', token);
-        
-        // Show success message
+        // Store user data in state instead of localStorage
         setErrors({ success: 'Google authentication successful! Redirecting...' });
         
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
         
-        // Redirect after 2 seconds
         setTimeout(() => {
           if (user.role === 'admin') {
-            window.location.href = '/admin/dashboard';
+            // console.log('Redirecting to admin dashboard');
           } else {
-            window.location.href = '/dashboard';
+            // console.log('Redirecting to user dashboard');
           }
         }, 2000);
         
       } catch (error) {
         console.error('Error parsing user data:', error);
-        setErrors({ general: 'Error processing authentication data.' });
-        // Clean up URL
         window.history.replaceState({}, document.title, window.location.pathname);
       }
     }
@@ -77,7 +68,6 @@ export default function AuthPage() {
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
@@ -101,7 +91,6 @@ export default function AuthPage() {
       newErrors.password = 'Password must be at least 6 characters';
     }
 
-    // Only validate additional fields for user registration
     if (!isAdminMode && !isUserLogin) {
       if (!formData.name) {
         newErrors.name = 'Name is required';
@@ -155,8 +144,8 @@ export default function AuthPage() {
         };
       }
 
-      console.log('Sending request to:', endpoint);
-      console.log('Payload:', payload);
+      // console.log('Sending request to:', endpoint);
+      // console.log('Payload:', payload);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -164,9 +153,9 @@ export default function AuthPage() {
         body: JSON.stringify(payload)
       });
 
-      console.log('Response status:', response.status);
+      // console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('Response data:', data);
+      // console.log('Response data:', data);
 
       if (response.ok && data.success) {
         // Store user data and token in localStorage
@@ -185,16 +174,19 @@ export default function AuthPage() {
         
         setErrors({ success: successMessage });
         
+        // Set redirecting state to keep button disabled
+        setIsRedirecting(true);
+        
         // Force redirect after 2 seconds
         setTimeout(() => {
-          console.log('Redirecting to dashboard...');
-          console.log('User role:', data.user.role);
+          // console.log('Redirecting to dashboard...');
+          // console.log('User role:', data.user.role);
           
           if (data.user.role === 'admin') {
-            console.log('Redirecting to admin dashboard');
+            // console.log('Redirecting to admin dashboard');
             window.location.href = '/admin/dashboard';
           } else {
-            console.log('Redirecting to user dashboard');
+            // console.log('Redirecting to user dashboard');
             window.location.href = '/dashboard';
           }
         }, 2000);
@@ -219,79 +211,110 @@ export default function AuthPage() {
     window.location.href = 'http://localhost:5000/users/google';
   };
 
-  return (
-    <ClientOnly fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading...</p>
-        </div>
+  // Show redirecting overlay
+  if (isRedirecting) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 bg-opacity-80 z-50">
+      <div className="relative flex">
+        <div className="w-16 h-16 rounded-full border-4 border-blue-500 animate-ping"></div>
+        <div className="absolute w-16 h-16 rounded-full border-4 border-blue-300 animate-pulse"></div>
+        <div className="absolute w-16 h-16 rounded-full border-4 border-blue-700 animate-spin"></div>
       </div>
-    }>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
+      <p className="ml-6 text-white text-xl font-semibold animate-pulse">Loading...</p>
+    </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-violet-500/10 to-pink-500/10 rounded-full blur-3xl animate-pulse delay-500"></div>
+        
+        {/* Floating particles */}
+        <div className="absolute top-20 left-20 w-2 h-2 bg-pink-500/60 rounded-full animate-ping delay-100"></div>
+        <div className="absolute top-40 right-32 w-1 h-1 bg-blue-500/60 rounded-full animate-ping delay-300"></div>
+        <div className="absolute bottom-32 left-1/4 w-3 h-3 bg-purple-500/40 rounded-full animate-ping delay-700"></div>
+        <div className="absolute bottom-20 right-20 w-2 h-2 bg-cyan-500/60 rounded-full animate-ping delay-500"></div>
+      </div>
+
+      <div className="relative z-10 flex items-center justify-center min-h-screen p-4">
         <div className="w-full max-w-md">
           {/* Header */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              {isAdminMode ? 'Admin Login' : 'Welcome to ScanNGo'}
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-gradient-to-br from-pink-500 to-violet-500 rounded-2xl shadow-2xl">
+                {isAdminMode ? (
+                  <Shield className="w-8 h-8 text-white" />
+                ) : (
+                  <Sparkles className="w-8 h-8 text-white" />
+                )}
+              </div>
+            </div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 bg-clip-text text-transparent mb-3">
+              {isAdminMode ? 'Admin Portal' : 'Welcome to ScanNGo'}
             </h1>
-            <p className="text-gray-600">
+            <p className="text-white/70 text-lg">
               {isAdminMode 
-                ? 'Access your admin dashboard' 
-                : 'Join us for seamless event management'
+                ? 'Access your administrative dashboard' 
+                : 'Join the future of seamless event management'
               }
             </p>
           </div>
 
           {/* Mode Toggle */}
-          <div className="flex justify-center mb-6">
-            <div className="bg-gray-100 p-1 rounded-lg">
+          <div className="flex justify-center mb-8">
+            <div className="bg-white/10 backdrop-blur-xl p-1 rounded-2xl border border-white/20 shadow-2xl">
               <button
                 onClick={() => {
                   setIsAdminMode(false);
-                  setIsUserLogin(true); // Reset to login when switching to user mode
+                  setIsUserLogin(true);
                 }}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   !isAdminMode
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg transform scale-105'
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
                 }`}
               >
-                User
+                <User className="w-4 h-4 mr-2 inline" />
+                User Portal
               </button>
               <button
                 onClick={() => setIsAdminMode(true)}
-                className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
                   isAdminMode
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg transform scale-105'
+                    : 'text-white/70 hover:text-white hover:bg-white/5'
                 }`}
               >
-                Admin
+                <Shield className="w-4 h-4 mr-2 inline" />
+                Admin Portal
               </button>
             </div>
           </div>
 
-          {/* User Mode Toggle - Only show when not in admin mode */}
+          {/* User Mode Toggle */}
           {!isAdminMode && (
-            <div className="flex justify-center mb-6">
-              <div className="bg-blue-100 p-1 rounded-lg">
+            <div className="flex justify-center mb-8">
+              <div className="bg-blue-500/20 backdrop-blur-xl p-1 rounded-2xl border border-blue-500/30 shadow-xl">
                 <button
                   onClick={() => setIsUserLogin(true)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${
                     isUserLogin
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
-                  Login
+                  Sign In
                 </button>
                 <button
                   onClick={() => setIsUserLogin(false)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                  className={`px-6 py-2 rounded-xl text-sm font-semibold transition-all duration-300 ${
                     !isUserLogin
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg'
+                      : 'text-white/70 hover:text-white hover:bg-white/10'
                   }`}
                 >
                   Register
@@ -301,35 +324,51 @@ export default function AuthPage() {
           )}
 
           {/* Auth Card */}
-          <Card className="shadow-xl border-0">
-            <CardHeader className="text-center pb-4">
-              <CardTitle className="text-xl">
+          <Card className="border-white/10 bg-white/5 backdrop-blur-2xl shadow-2xl hover:shadow-pink-500/10 transition-all duration-500">
+            <CardHeader className="text-center pb-6">
+              <CardTitle className="text-2xl font-bold text-white flex items-center justify-center gap-3">
+                <div className={`p-2 rounded-lg ${
+                  isAdminMode 
+                    ? 'bg-gradient-to-br from-blue-500 to-cyan-500' 
+                    : isUserLogin 
+                      ? 'bg-gradient-to-br from-pink-500 to-purple-500'
+                      : 'bg-gradient-to-br from-green-500 to-emerald-500'
+                }`}>
+                  {isAdminMode ? (
+                    <Shield className="w-5 h-5" />
+                  ) : isUserLogin ? (
+                    <User className="w-5 h-5" />
+                  ) : (
+                    <Sparkles className="w-5 h-5" />
+                  )}
+                </div>
                 {isAdminMode 
-                  ? 'Admin Login' 
+                  ? 'Admin Access' 
                   : isUserLogin 
-                    ? 'User Login' 
-                    : 'Create Account'
+                    ? 'Welcome Back' 
+                    : 'Join Us Today'
                 }
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-white/60 text-base">
                 {isAdminMode 
-                  ? 'Enter your admin credentials'
+                  ? 'Enter your administrative credentials to continue'
                   : isUserLogin
-                    ? 'Sign in to your account'
-                    : 'Fill in your details to get started'
+                    ? 'Sign in to access your personalized dashboard'
+                    : 'Create your account and start your journey with us'
                 }
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name Field - Only for User Registration */}
+            
+            <CardContent className="space-y-6">
+              <div className="space-y-5">
+                {/* Name Field */}
                 {!isAdminMode && !isUserLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="text-sm font-medium">
+                    <Label htmlFor="name" className="text-sm font-semibold text-white/90">
                       Full Name
                     </Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-pink-400 transition-colors" />
                       <Input
                         id="name"
                         name="name"
@@ -337,23 +376,26 @@ export default function AuthPage() {
                         placeholder="Enter your full name"
                         value={formData.name}
                         onChange={handleInputChange}
-                        className={`pl-10 ${errors.name ? 'border-red-500' : ''}`}
+                        className={`pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder-white/50 rounded-xl focus:border-pink-500/50 focus:ring-2 focus:ring-pink-500/20 transition-all duration-300 ${errors.name ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''}`}
                       />
                     </div>
                     {errors.name && (
-                      <p className="text-red-500 text-xs">{errors.name}</p>
+                      <div className="flex items-center gap-2 text-red-400 text-sm">
+                        <AlertCircle className="w-4 h-4" />
+                        {errors.name}
+                      </div>
                     )}
                   </div>
                 )}
 
-                {/* Mobile Number Field - Only for User Registration */}
+                {/* Mobile Number Field */}
                 {!isAdminMode && !isUserLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="mobileNo" className="text-sm font-medium">
+                    <Label htmlFor="mobileNo" className="text-sm font-semibold text-white/90">
                       Mobile Number
                     </Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-green-400 transition-colors" />
                       <Input
                         id="mobileNo"
                         name="mobileNo"
@@ -361,22 +403,25 @@ export default function AuthPage() {
                         placeholder="Enter mobile number"
                         value={formData.mobileNo}
                         onChange={handleInputChange}
-                        className={`pl-10 ${errors.mobileNo ? 'border-red-500' : ''}`}
+                        className={`pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder-white/50 rounded-xl focus:border-green-500/50 focus:ring-2 focus:ring-green-500/20 transition-all duration-300 ${errors.mobileNo ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''}`}
                       />
                     </div>
                     {errors.mobileNo && (
-                      <p className="text-red-500 text-xs">{errors.mobileNo}</p>
+                      <div className="flex items-center gap-2 text-red-400 text-sm">
+                        <AlertCircle className="w-4 h-4" />
+                        {errors.mobileNo}
+                      </div>
                     )}
                   </div>
                 )}
 
                 {/* Email Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium">
+                  <Label htmlFor="email" className="text-sm font-semibold text-white/90">
                     Email Address
                   </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-blue-400 transition-colors" />
                     <Input
                       id="email"
                       name="email"
@@ -384,21 +429,24 @@ export default function AuthPage() {
                       placeholder="Enter your email"
                       value={formData.email}
                       onChange={handleInputChange}
-                      className={`pl-10 ${errors.email ? 'border-red-500' : ''}`}
+                      className={`pl-12 pr-4 py-3 bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder-white/50 rounded-xl focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-300 ${errors.email ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''}`}
                     />
                   </div>
                   {errors.email && (
-                    <p className="text-red-500 text-xs">{errors.email}</p>
+                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                      <AlertCircle className="w-4 h-4" />
+                      {errors.email}
+                    </div>
                   )}
                 </div>
 
                 {/* Password Field */}
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-sm font-medium">
+                  <Label htmlFor="password" className="text-sm font-semibold text-white/90">
                     Password
                   </Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-purple-400 transition-colors" />
                     <Input
                       id="password"
                       name="password"
@@ -406,29 +454,32 @@ export default function AuthPage() {
                       placeholder="Enter your password"
                       value={formData.password}
                       onChange={handleInputChange}
-                      className={`pl-10 pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                      className={`pl-12 pr-12 py-3 bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder-white/50 rounded-xl focus:border-purple-500/50 focus:ring-2 focus:ring-purple-500/20 transition-all duration-300 ${errors.password ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''}`}
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                   </div>
                   {errors.password && (
-                    <p className="text-red-500 text-xs">{errors.password}</p>
+                    <div className="flex items-center gap-2 text-red-400 text-sm">
+                      <AlertCircle className="w-4 h-4" />
+                      {errors.password}
+                    </div>
                   )}
                 </div>
 
-                {/* Confirm Password Field - Only for User Registration */}
+                {/* Confirm Password Field */}
                 {!isAdminMode && !isUserLogin && (
                   <div className="space-y-2">
-                    <Label htmlFor="confirmPassword" className="text-sm font-medium">
+                    <Label htmlFor="confirmPassword" className="text-sm font-semibold text-white/90">
                       Confirm Password
                     </Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <div className="relative group">
+                      <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-cyan-400 transition-colors" />
                       <Input
                         id="confirmPassword"
                         name="confirmPassword"
@@ -436,35 +487,40 @@ export default function AuthPage() {
                         placeholder="Confirm your password"
                         value={formData.confirmPassword}
                         onChange={handleInputChange}
-                        className={`pl-10 pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                        className={`pl-12 pr-12 py-3 bg-white/10 backdrop-blur-xl border-white/20 text-white placeholder-white/50 rounded-xl focus:border-cyan-500/50 focus:ring-2 focus:ring-cyan-500/20 transition-all duration-300 ${errors.confirmPassword ? 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20' : ''}`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
                       >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
                     {errors.confirmPassword && (
-                      <p className="text-red-500 text-xs">{errors.confirmPassword}</p>
+                      <div className="flex items-center gap-2 text-red-400 text-sm">
+                        <AlertCircle className="w-4 h-4" />
+                        {errors.confirmPassword}
+                      </div>
                     )}
                   </div>
                 )}
 
                 {/* Success Message */}
                 {errors.success && (
-                  <Alert className="border-green-200 bg-green-50">
-                    <AlertDescription className="text-green-800">
+                  <Alert className="border-green-500/30 bg-green-500/10 backdrop-blur-xl">
+                    <CheckCircle className="w-5 h-5 text-green-400" />
+                    <AlertDescription className="text-green-300 font-medium ml-2">
                       {errors.success}
                     </AlertDescription>
                   </Alert>
                 )}
 
-                {/* General Error */}
+                {/* Error Message */}
                 {errors.general && (
-                  <Alert className="border-red-200 bg-red-50">
-                    <AlertDescription className="text-red-800">
+                  <Alert className="border-red-500/30 bg-red-500/10 backdrop-blur-xl">
+                    <AlertCircle className="w-5 h-5 text-red-400" />
+                    <AlertDescription className="text-red-300 font-medium ml-2">
                       {errors.general}
                     </AlertDescription>
                   </Alert>
@@ -472,118 +528,125 @@ export default function AuthPage() {
 
                 {/* Submit Button */}
                 <Button
-                  type="submit"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-medium transition-colors"
-                  disabled={isLoading}
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={isLoading || isRedirecting}
+                  className={`w-full py-4 px-6 rounded-xl font-semibold text-white border-0 transition-all duration-300 hover:scale-105 hover:shadow-2xl disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-2xl ${
+                    isAdminMode 
+                      ? 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 hover:shadow-blue-500/25'
+                      : isUserLogin 
+                        ? 'bg-gradient-to-r from-pink-500 to-purple-500 hover:from-pink-600 hover:to-purple-600 hover:shadow-pink-500/25'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 hover:shadow-green-500/25'
+                  }`}
                 >
                   {isLoading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      {isAdminMode 
-                        ? 'Signing In...' 
-                        : isUserLogin 
-                          ? 'Signing In...' 
-                          : 'Creating Account...'
-                      }
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-transparent bg-gradient-to-r from-white to-white/50 rounded-full"></div>
+                      <span>
+                        {isAdminMode 
+                          ? 'Authenticating...' 
+                          : isUserLogin 
+                            ? 'Signing You In...' 
+                            : 'Creating Your Account...'
+                        }
+                      </span>
+                    </div>
+                  ) : isRedirecting ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-transparent bg-gradient-to-r from-white to-white/50 rounded-full"></div>
+                      <span>
+                        {isAdminMode 
+                          ? 'Redirecting to Admin Dashboard...' 
+                          : 'Redirecting to Dashboard...'
+                        }
+                      </span>
                     </div>
                   ) : (
-                    isAdminMode 
-                      ? 'Sign In' 
-                      : isUserLogin 
-                        ? 'Sign In' 
-                        : 'Create Account'
+                    <span className="text-lg">
+                      {isAdminMode 
+                        ? 'Access Admin Portal' 
+                        : isUserLogin 
+                          ? 'Sign In to Continue' 
+                          : 'Create My Account'
+                      }
+                    </span>
                   )}
                 </Button>
-              </form>
-
+                
+              </div>
               {/* Divider */}
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
+              <div className="relative my-8">
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                  <span className="px-4 text-white/60 font-medium border-rounded">Or continue with</span>
                 </div>
               </div>
 
-                            {/* Google Auth Button - Only available for user mode */}
+              {/* Google Auth Button */}
               {!isAdminMode ? (
                 <Button
                   onClick={handleGoogleAuth}
-                  variant="outline"
-                  className="w-full border-gray-300 hover:bg-gray-50 text-gray-700 py-2 px-4 rounded-lg font-medium transition-colors"
                   disabled={isGoogleLoading}
+                  className="w-full py-4 px-6 rounded-xl font-semibold border border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:shadow-xl"
                 >
                   {isGoogleLoading ? (
-                    <div className="flex items-center justify-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                      Redirecting to Google...
+                    <div className="flex items-center justify-center gap-3">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white rounded-full"></div>
+                      <span>Connecting to Google...</span>
                     </div>
                   ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                        <path
-                          fill="currentColor"
-                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        />
-                        <path
-                          fill="currentColor"
-                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.5 3.3-4.53 6.16-4.53z"
-                        />
-                      </svg>
-                      Continue with Google
-                    </>
+                    <div className="flex items-center justify-center gap-3">
+                      <Chrome className="w-5 h-5" />
+                      <span>Continue with Google</span>
+                    </div>
                   )}
                 </Button>
               ) : (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  Google authentication is not available for admin accounts
+                <div className="text-center py-6">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-yellow-300 text-sm font-medium">
+                    <Shield className="w-4 h-4" />
+                    Admin accounts require direct authentication
+                  </div>
                 </div>
               )}
 
               {/* Switch Mode Text */}
-              <div className="text-center mt-6">
-                <p className="text-sm text-gray-600">
+              <div className="text-center mt-8 pt-6 border-t border-white/10">
+                <p className="text-white/70 mb-3">
                   {isAdminMode 
-                    ? "Don't have an admin account? " 
+                    ? "Need a regular user account?" 
                     : isUserLogin 
-                      ? "Don't have an account? " 
-                      : "Already have an account? "
+                      ? "New to our platform?" 
+                      : "Already have an account?"
                   }
-                  <button
-                    onClick={() => {
-                      if (isAdminMode) {
-                        // Switch to user mode and show registration
-                        setIsAdminMode(false);
-                        setIsUserLogin(false);
-                      } else {
-                        // Toggle between login and register for users
-                        setIsUserLogin(!isUserLogin);
-                      }
-                    }}
-                    className="text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    {isAdminMode 
-                      ? 'Switch to user registration' 
-                      : isUserLogin 
-                        ? 'Register here' 
-                        : 'Sign in here'
-                    }
-                  </button>
                 </p>
+                <button
+                  onClick={() => {
+                    if (isAdminMode) {
+                      setIsAdminMode(false);
+                      setIsUserLogin(false);
+                    } else {
+                      setIsUserLogin(!isUserLogin);
+                    }
+                  }}
+                  className="text-transparent bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text hover:from-pink-300 hover:to-purple-300 font-bold text-lg transition-all duration-300 hover:scale-105"
+                >
+                  {isAdminMode 
+                    ? 'Create User Account →' 
+                    : isUserLogin 
+                      ? 'Join Us Today →' 
+                      : 'Sign In Instead →'
+                  }
+                </button>
               </div>
             </CardContent>
           </Card>
+
+          {/* Footer */}
+          <div className="text-center mt-8 text-white/40 text-sm">
+            <p>© 2025 ScanNGo. Powered by innovation.</p>
+          </div>
         </div>
       </div>
-    </ClientOnly>
+    </div>
   );
 }

@@ -121,3 +121,63 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Override browser autofill styles to maintain custom input styling */
+@layer components {
+  /* Chrome, Safari, Edge autofill override */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus,
+  input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.1) inset !important;
+    -webkit-text-fill-color: white !important;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    transition: background-color 5000s ease-in-out 0s !important;
+  }
+
+  /* Firefox autofill override */
+  input:-moz-autofill,
+  input:-moz-autofill:focus {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+  }
+
+  /* General autofill override for all browsers */
+  input[type="email"]:autofill,
+  input[type="password"]:autofill,
+  input[type="text"]:autofill,
+  input[type="tel"]:autofill {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+  }
+
+  /* Focus state for autofilled inputs */
+  input:-webkit-autofill:focus {
+    border-color: rgba(236, 72, 153, 0.5) !important;
+    box-shadow: 0 0 0 2px rgba(236, 72, 153, 0.2) !important;
+  }
+
+  /* Specific styling for different input types when autofilled */
+  input[type="email"]:-webkit-autofill {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.1) inset !important;
+  }
+
+  input[type="password"]:-webkit-autofill {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    -webkit-box-shadow: 0 0 0 30px rgba(255, 255, 255, 0.1) inset !important;
+  }
+
+  /* Ensure placeholder text remains visible */
+  input::placeholder {
+    color: rgba(255, 255, 255, 0.5) !important;
+    opacity: 1 !important;
+  }
+
+  /* Override any browser default styles */
+  input {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+  }
+}

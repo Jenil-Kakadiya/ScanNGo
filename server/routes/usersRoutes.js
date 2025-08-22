@@ -9,14 +9,22 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const router = express.Router();
 
 // Get all users
-// router.get('/', async (req, res) => {
-//   try {
-//     const users = await User.findAll();
-//     res.json({ users });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
+router.get('/user', authenticateToken,  async (req, res) => {
+  try {
+    // console.log("----")
+    const user = await User.findByPk(req.user.id, {
+      row: true
+    });
+    res.json({
+        email : user.email,
+        name: user.name,
+        mobileNo: user.mobileNo,
+        role: user.role
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 router.post('/register', async (req, res) => {
   try {
@@ -125,6 +133,7 @@ router.post('/login', async (req, res) => {
     });
   }
 });
+
 
 router.get('/get-email', authenticateToken, async (req, res) => {
 
@@ -235,10 +244,14 @@ router.get("/google/callback",
         email: user.email,
         role: user.role
       }));
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?token=${token}&user=${userData}`);
+      
+      // Use hardcoded frontend URL for now (you can set this as env variable later)
+      const frontendUrl = process.env.FRONTEND_URL;
+      res.redirect(`${frontendUrl}/dashboard/?token=${token}&user=${userData}`);
     } catch (error) {
       console.error('Google callback error:', error);
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}?error=Authentication failed`);
+      const frontendUrl = process.env.FRONTEND_URL;
+      res.redirect(`${frontendUrl}?error=Authentication failed`);
     }
   }
 );
