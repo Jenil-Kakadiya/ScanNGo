@@ -1,62 +1,71 @@
 const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('User', {
+  const User = sequelize.define('User', {  // Model name "User"
     id: {
-      type: DataTypes.INTEGER(32),
+      type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
-    name: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
-    email: {
+    name: { type: DataTypes.STRING, allowNull: false },
+    personalEmail: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
-      validate: {
-        isEmail: true
-      }
+      validate: { isEmail: true }
+    },
+    universityEmail: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+      validate: { isEmail: true }
+    },
+    universityRollNo: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false
     },
     mobileNo: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
-      validate: {
-        isNumeric: true
-      }
+      validate: { isNumeric: true }
     },
-    password: {
-      type: DataTypes.STRING,
+    department: {
+      type: DataTypes.ENUM('ICT', 'CSE'),
       allowNull: false
     },
-    role : {
+    batch: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      validate: { is: /^\d{4}-\d{4}$/ }
+    },
+    password: { type: DataTypes.STRING, allowNull: false },
+    role: {
       type: DataTypes.ENUM('user', 'admin'),
       allowNull: false,
       defaultValue: 'user'
-    },
+    }
   }, {
     hooks: {
       beforeCreate: async (user) => {
-        if (user.password && user.authType === 'credentials') {
+        if (user.password) {
           const salt = await bcrypt.genSalt(10);
           user.password = await bcrypt.hash(user.password, salt);
         }
       }
     },
-    timestamps: false,
-    tableName: 'users'
+    timestamps: true,
+    tableName: 'users'  // lowercase table
   });
 
-  // Instance method to check password
   User.prototype.comparePassword = async function(candidatePassword) {
-    if (this.authType !== 'credentials') {
-      return false;
-    }
     return await bcrypt.compare(candidatePassword, this.password);
   };
 
+  User.associate = (models) => {
+    User.hasOne(models.Contactmeta, { foreignKey: 'userId' });
+  };
 
   return User;
 };
