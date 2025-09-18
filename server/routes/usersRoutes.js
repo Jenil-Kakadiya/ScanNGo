@@ -16,7 +16,7 @@ router.get('/user', authenticateToken,  async (req, res) => {
       row: true
     });
     res.json({
-        email : user.email,
+        email : user.personalEmail,
         name: user.name,
         mobileNo: user.mobileNo,
         role: user.role
@@ -28,7 +28,8 @@ router.get('/user', authenticateToken,  async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    const { name, email, mobileNo, password, role = 'user' } = req.body;
+    console.log(req.body)
+    const { name, email, mobileNo, password, role = 'user'} = req.body;
 
     if (!name || !email || !mobileNo || !password ) {
       return res.status(400).json({ 
@@ -36,16 +37,16 @@ router.post('/register', async (req, res) => {
         error: 'All fields are required' 
       });
     }
-
-    const existingUser = await User.findOne({ where: { email } });
-    
+    // console.log("-------0")
+    const existingUser = await User.findOne({ where: { personalEmail : email } });
+    // console.log(existingUser)
     if (existingUser) {
       return res.status(400).json({ 
         success: false,
         error: 'Email already exists' 
       });
     }
-    
+    // console.log("-------1")
     const existingUserByMobile = await User.findOne({ where: { mobileNo } });
     if (existingUserByMobile) {
       return res.status(400).json({ 
@@ -53,19 +54,21 @@ router.post('/register', async (req, res) => {
         error: 'Mobile number already exists' 
       });
     }
-    
+    console.log("-------2")
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({ 
       name, 
-      email, 
-      mobileNo, 
+      personalEmail : email, 
+      mobileNo,
+      universityEmail : '',
       password: hashedPassword,
+      batch: '2022-2026',
       role 
     });
-
+    // console.log("-------3")
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role }, 
+      { userId: user.id, email: user.personalEmail, role: user.role }, 
       process.env.JWT_SECRET || 'fallback_secret', 
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
@@ -96,7 +99,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const user = await User.findOne({ where: { email } });
+    const user = await User.findOne({ where: { personalEmail: email } });
     if (!user) {
       return res.status(400).json({ 
         success: false,
@@ -113,7 +116,7 @@ router.post('/login', async (req, res) => {
     }
     
     const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role }, 
+      { userId: user.id, email: user.personalEmail, role: user.role }, 
       process.env.JWT_SECRET || 'fallback_secret', 
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
@@ -142,7 +145,7 @@ router.get('/get-email', authenticateToken, async (req, res) => {
 
   res.status(202).json({
     success:true,
-    email: user.email
+    email: user.personalEmail
   });
 });
 
@@ -162,7 +165,7 @@ router.get('/get-email', authenticateToken, async (req, res) => {
 async function findOrCreateUser(email, name) {
   try {
     // First, try to find existing user by email
-    let user = await User.findOne({ where: { email } });
+    let user = await User.findOne({ where: { personalEmail: email } });
     
     if (user) {
       // User exists, update last login time
@@ -175,10 +178,10 @@ async function findOrCreateUser(email, name) {
     // but they won't be used since authType is 'google'
     user = await User.create({
       name: name,
-      email: email,
+      personalEmail: email,
       role: 'user',
       password: 'google_oauth_user', // Placeholder password, won't be used
-      mobileNo: 9999999999, // Placeholder mobile number, won't be used
+      mobileNo: '9999999999', // Placeholder mobile number, won't be used
     });
 
     return user;
@@ -232,7 +235,7 @@ router.get("/google/callback",
     try {
       const user = req.user;
       const token = jwt.sign(
-        { userId: user.id, email: user.email, role: user.role }, 
+        { userId: user.id, email: user.personalEmail, role: user.role }, 
         process.env.JWT_SECRET || 'fallback_secret', 
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
@@ -241,7 +244,7 @@ router.get("/google/callback",
       const userData = encodeURIComponent(JSON.stringify({
         id: user.id,
         name: user.name,
-        email: user.email,
+        email: user.personalEmail,
         role: user.role
       }));
       

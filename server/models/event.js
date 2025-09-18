@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  const event = sequelize.define('event', {
+  const Event = sequelize.define('Event', {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -31,10 +31,10 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'events'
   });
 
-  event.associate = (models) => {
-    event.belongsTo(models.User, { foreignKey: 'organizerId' });
-    event.hasMany(models.registration, { foreignKey: 'eventId' });
+  Event.associate = (models) => {
+    Event.belongsTo(models.User, { foreignKey: 'organizerId' });
+    Event.hasMany(models.Registration, { foreignKey: 'eventId' });
   };
 
-  return event;
+  return Event;
 };

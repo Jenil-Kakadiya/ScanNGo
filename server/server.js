@@ -7,6 +7,8 @@ const session = require("express-session");
 
 // Import routes
 const userRoutes = require('./routes/usersRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const eventsRoutes = require('./routes/eventsRoutes');
 const authRoutes = require('./routes/auth');
 
 // Middleware
@@ -34,6 +36,8 @@ app.get('/', (req, res) => {
 });
 
 app.use('/users', userRoutes);
+app.use('/admin', adminRoutes);
+app.use('/admin/events', eventsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

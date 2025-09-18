@@ -152,7 +152,7 @@ export default function UserDashboard() {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/users/user', {
+        const response = await fetch('http://localhost:5000/admin/adminData', {
           method: "GET",
           headers: {
             'Content-Type': "application/json",

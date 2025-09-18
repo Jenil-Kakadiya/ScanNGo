@@ -176,8 +176,35 @@
   }
 
   /* Override any browser default styles */
-  input {
+  /* input {
     background-color: rgba(255, 255, 255, 0.1) !important;
-    color: white !important;
-  }
+    color: black !important;
+  } */
 }
+
+.dialog-form-event input,
+.dialog-form-event textarea,
+.dialog-form-event [data-radix-select-trigger] {
+  color: #000 !important;
+  background-color: #fff !important;
+}
+
+.dialog-form-event input::placeholder,
+.dialog-form-event textarea::placeholder {
+  color: #6b7280 !important; /* Tailwind's gray-500 */
+}
+
+.dialog-form-event select,
+.dialog-form-event [role="option"] {
+  color: #000 !important;
+  background-color: #fff !important;
+}
+/* globals.css */
+.auth-page {
+  color: white;
+}
+
+.auth-page * {
+  color: inherit;
+}
+

@@ -1,28 +1,18 @@
 const bcrypt = require('bcryptjs');
 
 module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('User', {  // Model name "User"
+  const Admin = sequelize.define('Admin', {  // Model name "User"
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true
     },
     name: { type: DataTypes.STRING, allowNull: false },
-    personalEmail: {
+    email: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
       validate: { isEmail: true }
-    },
-    universityEmail: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "",
-    },
-    universityRollNo: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "333"
     },
     mobileNo: {
       type: DataTypes.STRING,
@@ -31,21 +21,14 @@ module.exports = (sequelize, DataTypes) => {
       validate: { isNumeric: true }
     },
     department: {
-      type: DataTypes.ENUM('ICT', 'CSE'),
-      allowNull: true,
-      defaultValue: "ICT"
-    },
-    batch: {
       type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "2023-2024",
-      validate: { is: /^\d{4}-\d{4}$/ }
+      allowNull: false
     },
     password: { type: DataTypes.STRING, allowNull: false },
     role: {
-      type: DataTypes.ENUM('user'),
+      type: DataTypes.ENUM('admin'),
       allowNull: false,
-      defaultValue: 'user'
+      defaultValue: 'admin'
     }
   }, {
     hooks: {
@@ -57,18 +40,16 @@ module.exports = (sequelize, DataTypes) => {
       }
     },
     timestamps: true,
-    tableName: 'users'  // lowercase table
+    tableName: 'admins'  // lowercase table
   });
 
-  User.prototype.comparePassword = async function(candidatePassword) {
+  Admin.prototype.comparePassword = async function(candidatePassword) {
     return await bcrypt.compare(candidatePassword, this.password);
   };
 
-  User.associate = (models) => {
-    User.hasOne(models.Contactmeta, { foreignKey: 'userId' });
-    User.hasMany(models.Event, { foreignKey: 'organizerId' });
-    User.hasMany(models.Registration, { foreignKey: 'userId' });
+  Admin.associate = (models) => {
+    Admin.hasOne(models.Contactmeta, { foreignKey: 'adminId' });
   };
 
-  return User;
+  return Admin;
 };

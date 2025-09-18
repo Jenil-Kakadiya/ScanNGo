@@ -18,7 +18,7 @@ export default function AuthPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    mobileNo: ''
+    mobileNo: '',
   });
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
@@ -123,10 +123,12 @@ export default function AuthPage() {
     try {
       let endpoint;
       let payload;
-
+      // // console.log(formData);
+      // console.log(isAdminMode)
+      // console.log(isUserLogin)
       if (isAdminMode) {
         // Admin login
-        endpoint = 'http://localhost:5000/users/login';
+        endpoint = 'http://localhost:5000/admin/login';
         payload = { email: formData.email, password: formData.password };
       } else if (isUserLogin) {
         // User login
@@ -135,6 +137,8 @@ export default function AuthPage() {
       } else {
         // User registration
         endpoint = 'http://localhost:5000/users/register';
+
+        // console.log(formData);
         payload = { 
           name: formData.name, 
           email: formData.email, 
@@ -143,9 +147,6 @@ export default function AuthPage() {
           role: 'user'
         };
       }
-
-      // console.log('Sending request to:', endpoint);
-      // console.log('Payload:', payload);
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -181,7 +182,8 @@ export default function AuthPage() {
         setTimeout(() => {
           // console.log('Redirecting to dashboard...');
           // console.log('User role:', data.user.role);
-          
+          // console.log(data.user);
+          // console.log(data.user.role);
           if (data.user.role === 'admin') {
             // console.log('Redirecting to admin dashboard');
             window.location.href = '/admin/dashboard';
@@ -226,7 +228,7 @@ export default function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="auth-page min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-pink-500/20 to-purple-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -418,7 +420,7 @@ export default function AuthPage() {
                 {/* Email Field */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-semibold text-white/90">
-                    Email Address
+                    Personal Email Address
                   </Label>
                   <div className="relative group">
                     <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white/50 h-5 w-5 group-focus-within:text-blue-400 transition-colors" />
@@ -439,7 +441,6 @@ export default function AuthPage() {
                     </div>
                   )}
                 </div>
-
                 {/* Password Field */}
                 <div className="space-y-2">
                   <Label htmlFor="password" className="text-sm font-semibold text-white/90">

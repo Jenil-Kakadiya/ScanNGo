@@ -1,5 +1,5 @@
 module.exports = (sequelize, DataTypes) => {
-  const registration = sequelize.define('registration', {
+  const Registration = sequelize.define('Registration', {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
@@ -31,10 +31,10 @@ module.exports = (sequelize, DataTypes) => {
     tableName: 'registrations'
   });
 
-  registration.associate = (models) => {
-    registration.belongsTo(models.event, { foreignKey: 'eventId' });
-    registration.belongsTo(models.User, { foreignKey: 'userId' });
+  Registration.associate = (models) => {
+    Registration.belongsTo(models.Event, { foreignKey: 'eventId' });
+    Registration.belongsTo(models.User, { foreignKey: 'userId' });
   };
 
-  return registration;
+  return Registration;
 };
