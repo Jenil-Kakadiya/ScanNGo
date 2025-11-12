@@ -7,6 +7,9 @@ export const metadata: Metadata = {
   title: 'ScanNGo - Event Management',
   description: 'Seamless event management and attendance tracking',
   generator: 'v0.dev',
+  icons: {
+    icon: '/logo.png',
+  },
 }
 
 export default function RootLayout({

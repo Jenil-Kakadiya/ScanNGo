@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 
-const adminPassword = 'john@123';
+const adminPassword = 'Admi@123';
 
 async function createAdminHash() {
   const hashedPassword = await bcrypt.hash(adminPassword, 10);

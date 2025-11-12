@@ -43,9 +43,14 @@ module.exports = (sequelize, DataTypes) => {
     },
     password: { type: DataTypes.STRING, allowNull: false },
     role: {
-      type: DataTypes.ENUM('user'),
+      type: DataTypes.ENUM('user', 'delegate'),
       allowNull: false,
       defaultValue: 'user'
+    },
+    isActive: {
+      type: DataTypes.INTEGER(2),
+      allowNull: false,
+      defaultValue: 1
     }
   }, {
     hooks: {
@@ -68,6 +73,7 @@ module.exports = (sequelize, DataTypes) => {
     User.hasOne(models.Contactmeta, { foreignKey: 'userId' });
     User.hasMany(models.Event, { foreignKey: 'organizerId' });
     User.hasMany(models.Registration, { foreignKey: 'userId' });
+    User.hasMany(models.Attendance, { foreignKey: 'markedBy', as: 'MarkedAttendances' });
   };
 
   return User;

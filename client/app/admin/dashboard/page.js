@@ -8,20 +8,34 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, AlertCircle, CheckCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle, ArrowLeft, Users, Calendar, Clock, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import AdminNavbar from '../../../components/AdminNavbar'
 
 export default function AdminDashboard() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [activeUsers, setActiveUsers] = useState(0);
-  const [totalEvents, setTotalEvents] = useState(0);
-  const [activeEvents, setActiveEvents] = useState(0);
-  const [totalRegistrations, setTotalRegistrations] = useState(0);
+  const [events, setEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [view, setView] = useState('events'); // 'events', 'days', 'sessions', 'attendees'
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [selectedDay, setSelectedDay] = useState(null);
+  const [selectedSession, setSelectedSession] = useState(null);
+  const [days, setDays] = useState([]);
+  const [daysLoading, setDaysLoading] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [attendees, setAttendees] = useState([]);
+  const [attendeesLoading, setAttendeesLoading] = useState(false);
+  const [eligibleUsers, setEligibleUsers] = useState([]);
+  const [eligibleLoading, setEligibleLoading] = useState(false);
+  const [delegates, setDelegates] = useState([]);
+  const [delegatesLoading, setDelegatesLoading] = useState(false);
+  const [delegatesError, setDelegatesError] = useState(null);
+  const [attendanceExporting, setAttendanceExporting] = useState(false);
+  const [attendanceExportError, setAttendanceExportError] = useState(null);
+  const [isEligibleOpen, setIsEligibleOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isViewEventsOpen, setIsViewEventsOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [eventForm, setEventForm] = useState({
@@ -37,7 +51,6 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      // Check if user is authenticated and is admin
       const token = localStorage.getItem('token');
       if (!token) {
         console.log('No user data or token found, redirecting to login');
@@ -59,29 +72,20 @@ export default function AdminDashboard() {
 
         const userData = await response.json();
 
-        // Check if user is admin
         if (userData.role !== 'admin') {
           router.push('/dashboard');
           return;
         }
 
         setUser(userData);
-        // console.log('Admin authenticated:', userObj);
 
-        // Set statistics from API response
-        if (userData.stats) {
-          setTotalUsers(userData.stats.totalUsers || 0);
-          setActiveUsers(userData.stats.activeUsers || 0);
-          setTotalEvents(userData.stats.totalEvents || 0);
-          setActiveEvents(userData.stats.activeEvents || 0);
-          setTotalRegistrations(userData.stats.totalRegistrations || 0);
-        }
-
-        // Prefill creatorEmail for create event form
         setEventForm((prev) => ({
           ...prev,
           creatorEmail: userData.email || ''
         }));
+
+        // Fetch events on load
+        fetchEvents();
       } catch (error) {
         console.error('Error parsing user data:', error);
         localStorage.removeItem('token');
@@ -94,6 +98,303 @@ export default function AdminDashboard() {
 
     checkAuth();
   }, [router]);
+
+  const fetchEvents = async () => {
+    try {
+      setEventsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('http://localhost:5000/admin/events', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch events');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setEvents(data.events || []);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      setErrors({ general: 'Failed to fetch events. Please try again.' });
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  const fetchDays = async (eventId) => {
+    try {
+      setDaysLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch days');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setDays(data.days || []);
+      }
+    } catch (error) {
+      console.error('Error fetching days:', error);
+      setErrors({ general: 'Failed to fetch days. Please try again.' });
+    } finally {
+      setDaysLoading(false);
+    }
+  };
+
+  const fetchSessions = async (eventId, dayId) => {
+    try {
+      setSessionsLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days/${dayId}/sessions`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch sessions');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setSessions(data.sessions || []);
+        setSelectedDay(data.day);
+      }
+    } catch (error) {
+      console.error('Error fetching sessions:', error);
+      setErrors({ general: 'Failed to fetch sessions. Please try again.' });
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const fetchEligibleUsers = async (eventId) => {
+    try {
+      setEligibleLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/certificate/eligible-users`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setErrors({ general: data.error || 'Failed to fetch eligible users.' });
+        return;
+      }
+      setEligibleUsers(data.eligibleUsers || []);
+      setIsEligibleOpen(true);
+    } catch (e) {
+      console.error('Error fetching eligible users:', e);
+      setErrors({ general: 'Failed to fetch eligible users.' });
+    } finally {
+      setEligibleLoading(false);
+    }
+  };
+
+  const fetchAttendees = async (eventId, dayId, sessionId) => {
+    try {
+      setAttendeesLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days/${dayId}/sessions/${sessionId}/attendees`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch attendees');
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setAttendees(data.attendees || []);
+        setSelectedSession(data.session);
+      }
+    } catch (error) {
+      console.error('Error fetching attendees:', error);
+      setErrors({ general: 'Failed to fetch attendees. Please try again.' });
+    } finally {
+      setAttendeesLoading(false);
+    }
+  };
+
+  const fetchDelegates = async (eventId) => {
+    try {
+      setDelegatesLoading(true);
+      setDelegatesError(null);
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/delegates`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setDelegates([]);
+        setDelegatesError(data.error || 'Failed to fetch delegates.');
+        return;
+      }
+      setDelegates(data.delegates || []);
+    } catch (error) {
+      console.error('Error fetching delegates:', error);
+      setDelegates([]);
+      setDelegatesError('Failed to fetch delegates. Please try again.');
+    } finally {
+      setDelegatesLoading(false);
+    }
+  };
+
+  const handleEventClick = async (event) => {
+    setSelectedEvent(event);
+    setView('days');
+    setDelegates([]);
+    setAttendanceExportError(null);
+    await Promise.all([fetchDays(event.id), fetchDelegates(event.id)]);
+  };
+
+  const handleDayClick = async (day) => {
+    setSelectedDay(day);
+    setView('sessions');
+    await fetchSessions(selectedEvent.id, day.id);
+  };
+
+  const handleSessionClick = async (session) => {
+    setSelectedSession(session);
+    setView('attendees');
+    await fetchAttendees(selectedEvent.id, selectedDay.id, session.id);
+  };
+
+  const handleBack = () => {
+    if (view === 'attendees') {
+      setView('sessions');
+      setSelectedSession(null);
+      setAttendees([]);
+    } else if (view === 'sessions') {
+      setView('days');
+      setSelectedDay(null);
+      setSessions([]);
+    } else if (view === 'days') {
+      setView('events');
+      setSelectedEvent(null);
+      setDays([]);
+      setDelegates([]);
+      setDelegatesError(null);
+      setAttendanceExportError(null);
+    }
+  };
+
+  const handleDownloadAttendance = async () => {
+    if (!selectedEvent) return;
+    try {
+      setAttendanceExporting(true);
+      setAttendanceExportError(null);
+
+      const token = localStorage.getItem('token');
+      const response = await fetch(`http://localhost:5000/admin/events/${selectedEvent.id}/attendance/export`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setAttendanceExportError(data.error || 'Failed to download attendance logs.');
+        return;
+      }
+
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.utils.book_new();
+      const days = data.days || [];
+
+      if (days.length === 0) {
+        const worksheet = XLSX.utils.aoa_to_sheet([['No attendance records available.']]);
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Attendance');
+      } else {
+        days.forEach((day, index) => {
+          const sheetRows = [];
+          const dayTitle = day.title || formatDate(day.dayDate);
+          sheetRows.push([`Day: ${dayTitle}`]);
+          sheetRows.push([]);
+
+          const sessions = day.sessions || [];
+          if (sessions.length === 0) {
+            sheetRows.push(['No sessions available.']);
+          } else {
+            sessions.forEach((session, sessionIndex) => {
+              sheetRows.push([`Session: ${session.title}`]);
+              sheetRows.push(['Attendee Name', 'Attendee Email', 'Marked At']);
+              const attendees = session.attendees || [];
+              if (attendees.length === 0) {
+                sheetRows.push(['No attendees recorded.', '', '']);
+              } else {
+                attendees.forEach((attendance) => {
+                  const attendeeName = attendance.user?.name || 'N/A';
+                  const attendeeEmail = attendance.user?.email || 'N/A';
+                  const markedAt = attendance.markedAt
+                    ? new Date(attendance.markedAt).toLocaleString()
+                    : '';
+                  sheetRows.push([attendeeName, attendeeEmail, markedAt]);
+                });
+              }
+              if (sessionIndex !== sessions.length - 1) {
+                sheetRows.push([]);
+              }
+            });
+          }
+
+          const worksheet = XLSX.utils.aoa_to_sheet(sheetRows);
+          XLSX.utils.book_append_sheet(workbook, worksheet, `Day ${index + 1}`);
+        });
+      }
+
+      const safeEventName = (data.event?.name || 'event')
+        .replace(/[\\\/:*?"<>|]/g, '_')
+        .replace(/\s+/g, '_');
+      const arrayBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([arrayBuffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeEventName}_attendance.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Error downloading attendance logs:', error);
+      setAttendanceExportError('Failed to download attendance logs. Please try again.');
+    } finally {
+      setAttendanceExporting(false);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('user');
@@ -116,31 +417,46 @@ export default function AdminDashboard() {
         return;
       }
 
-      // Placeholder: wire this to your API endpoint, e.g., POST /events
       const token = localStorage.getItem('token');
-      await fetch('http://localhost:5000/admin/events/create', {
+      const response = await fetch('http://localhost:5000/admin/events/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify(eventForm)
       });
 
-      // console.log('Submitting event payload:', eventForm);
-      setIsCreateOpen(false);
-      setEventForm({
-        name: '',
-        description: '',
-        status: 'active',
-        location: '',
-        dateTime: '',
-        organizerId: '',
-        creatorEmail: user?.email || ''
-      });
+      if (response.ok) {
+        setIsCreateOpen(false);
+        setEventForm({
+          name: '',
+          description: '',
+          status: 'active',
+          location: '',
+          dateTime: '',
+          organizerId: '',
+          creatorEmail: user?.email || ''
+        });
+        setErrors({ success: 'Event created successfully!' });
+        fetchEvents(); // Refresh events list
+        setTimeout(() => setErrors({}), 3000);
+      } else {
+        setErrors({ general: 'Failed to create event. Please try again.' });
+      }
     } catch (err) {
       console.error(err);
       setErrors({ general: 'Failed to create event. Please try again.' });
     } finally {
       setCreateLoading(false);
     }
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
   if (loading) {
@@ -180,142 +496,384 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Header */}
-        {/* <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-            <p className="text-gray-600">Welcome back, {user.name}!</p>
-          </div>
-          <div className="flex gap-3">
-            <Button
-              onClick={() => setIsCreateOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Create Event
-            </Button>
-            <Button onClick={handleLogout} variant="outline">
-              Logout
-            </Button>
-          </div>
-        </div> */}
-
         <AdminNavbar
           user={user}
           onCreateEvent={() => setIsCreateOpen(true)}
           onLogout={handleLogout}
         />
 
-        {/* Admin Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8 mt-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalUsers}</div>
-              <p className="text-xs text-muted-foreground">Total registered users</p>
-            </CardContent>
-          </Card>
+        {/* Breadcrumb Navigation */}
+        {view !== 'events' && (
+          <div className="mb-6 flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleBack}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </Button>
+            <span className="text-gray-500">/</span>
+            {selectedEvent && <span className="text-gray-700">{selectedEvent.name}</span>}
+            {selectedDay && (
+              <>
+                <span className="text-gray-500">/</span>
+                <span className="text-gray-700">{selectedDay.title || formatDate(selectedDay.dayDate)}</span>
+              </>
+            )}
+            {selectedSession && (
+              <>
+                <span className="text-gray-500">/</span>
+                <span className="text-gray-700">{selectedSession.title}</span>
+              </>
+            )}
+          </div>
+        )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalEvents}</div>
-              <p className="text-xs text-muted-foreground">All created events</p>
-            </CardContent>
-          </Card>
+        {/* Events List View */}
+        {view === 'events' && (
+          <div className="mt-8">
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-3xl font-bold text-gray-900">Manage Activity</h1>
+            </div>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Events</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeEvents}</div>
-              <p className="text-xs text-muted-foreground">Currently running</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Registrations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalRegistrations}</div>
-              <p className="text-xs text-muted-foreground">All time</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Admin Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>Manage user accounts and permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Button className="w-full" variant="outline">
-                  View All Users
-                </Button>
-                <Button className="w-full" variant="outline">
-                  Create User
-                </Button>
-                <Button className="w-full" variant="outline">
-                  Manage Roles
-                </Button>
+            {eventsLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
               </div>
-            </CardContent>
-          </Card>
+            ) : events.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500">No events found. Create your first event to get started.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {events.map((event) => (
+                  <Card
+                    key={event.id}
+                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => handleEventClick(event)}
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-lg">{event.name}</CardTitle>
+                      <CardDescription>{event.description || 'No description'}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>{formatDate(event.dateTime)}</span>
+                        </div>
+                        {event.location && (
+                          <div className="flex items-center gap-2">
+                            <span>📍</span>
+                            <span>{event.location}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4" />
+                          <span>{event.attendees || 0} attendees</span>
+                        </div>
+                        <div className="pt-2">
+                          <span className={`inline-block px-2 py-1 rounded text-xs ${
+                            event.status === 'active' 
+                              ? 'bg-green-100 text-green-800' 
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {event.status}
+                          </span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Event Management</CardTitle>
-              <CardDescription>Create and manage events</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+        {/* Days List View */}
+        {view === 'days' && (
+          <div className="mt-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {selectedEvent?.name} - Days
+              </h2>
+              <div className="flex items-center gap-2">
                 <Button
-                  className="w-full"
-                  onClick={() => setIsCreateOpen(true)}
+                  variant="outline"
+                  onClick={handleDownloadAttendance}
+                  disabled={attendanceExporting || !selectedEvent}
                 >
-                  Create Event
+                  {attendanceExporting ? (
+                    'Generating...'
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Download className="w-4 h-4" />
+                      Download Attendance Logs
+                    </span>
+                  )}
                 </Button>
-                <Button className="w-full" variant="outline"
-                  onClick={() => setIsViewEventsOpen(true)}
+                <Button
+                  variant="outline"
+                  onClick={() => fetchEligibleUsers(selectedEvent.id)}
+                  disabled={eligibleLoading}
                 >
-                  View All Events
-                </Button>
-                <Button className="w-full" variant="outline">
-                  Event Analytics
+                  {eligibleLoading ? 'Loading...' : 'Eligible for Certificate'}
                 </Button>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>System Settings</CardTitle>
-              <CardDescription>Configure system preferences</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Button className="w-full" variant="outline">
-                  General Settings
-                </Button>
-                <Button className="w-full" variant="outline">
-                  Security Settings
-                </Button>
-                <Button className="w-full" variant="outline">
-                  Backup & Restore
-                </Button>
+            {attendanceExportError && (
+              <div className="mb-4 p-3 border border-red-200 bg-red-50 rounded-lg text-sm text-red-600">
+                {attendanceExportError}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6">
+              <div>
+                {daysLoading ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : days.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <p className="text-gray-500">No days found for this event.</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {days.map((day) => (
+                      <Card
+                        key={day.id}
+                        className="cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => handleDayClick(day)}
+                      >
+                        <CardHeader>
+                          <CardTitle className="text-lg">
+                            {day.title || formatDate(day.dayDate)}
+                          </CardTitle>
+                          <CardDescription>
+                            {day.sessionCount} session{day.sessionCount !== 1 ? 's' : ''}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Users className="w-4 h-4 text-blue-600" />
+                            <span className="text-2xl font-bold text-blue-600">{day.totalAttendance}</span>
+                            <span className="text-gray-600">total attendance</span>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <Card className="h-full">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Delegates</CardTitle>
+                        <CardDescription>
+                          Registered delegates for this event
+                        </CardDescription>
+                      </div>
+                      {selectedEvent && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => fetchDelegates(selectedEvent.id)}
+                          disabled={delegatesLoading}
+                        >
+                          {delegatesLoading ? 'Refreshing...' : 'Refresh'}
+                        </Button>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {delegatesLoading ? (
+                      <div className="flex justify-center items-center py-10">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      </div>
+                    ) : delegatesError ? (
+                      <div className="p-4 border border-red-200 bg-red-50 text-sm text-red-600 rounded-lg">
+                        {delegatesError}
+                      </div>
+                    ) : delegates.length === 0 ? (
+                      <div className="py-8 text-center text-gray-500">
+                        No delegates registered yet.
+                      </div>
+                    ) : (
+                      <div className="space-y-4 max-h-[420px] overflow-y-auto pr-1">
+                        {delegates.map((delegate) => (
+                          <div
+                            key={delegate.id}
+                            className="p-4 border rounded-lg bg-white shadow-sm"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-semibold text-gray-900">{delegate.name}</p>
+                                <p className="text-sm text-gray-500">{delegate.email}</p>
+                                <p className="text-sm text-gray-500">{delegate.mobileNo}</p>
+                              </div>
+                              <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700 uppercase">
+                                {delegate.status}
+                              </span>
+                            </div>
+                            <div className="mt-3">
+                              <p className="text-xs text-gray-500 uppercase tracking-wide">Verification Code</p>
+                              <p className="font-mono text-sm bg-gray-100 px-3 py-2 rounded mt-1 break-all">
+                                {delegate.verificationCode}
+                              </p>
+                            </div>
+                            <div className="mt-2 text-xs text-gray-400">
+                              Added on {new Date(delegate.createdAt).toLocaleString()}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Eligible Users Dialog */}
+        <Dialog open={isEligibleOpen} onOpenChange={setIsEligibleOpen}>
+          <DialogContent className="w-full max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Eligible Students{selectedEvent ? ` - ${selectedEvent.name}` : ''}</DialogTitle>
+              <DialogDescription>
+                {eligibleUsers.length} user{eligibleUsers.length !== 1 ? 's' : ''} eligible for certificate.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto">
+              {eligibleUsers.length === 0 ? (
+                <div className="p-6 text-center text-gray-500">No eligible users found.</div>
+              ) : (
+                <div className="divide-y">
+                  {eligibleUsers.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between p-3">
+                      <div>
+                        <div className="font-medium text-gray-900">{u.name}</div>
+                        <div className="text-sm text-gray-500">{u.email}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setIsEligibleOpen(false)} variant="outline">Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Sessions List View */}
+        {view === 'sessions' && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              {selectedDay?.title || formatDate(selectedDay?.dayDate)} - Sessions
+            </h2>
+
+            {sessionsLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : sessions.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500">No sessions found for this day.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {sessions.map((session) => (
+                  <Card
+                    key={session.id}
+                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => handleSessionClick(session)}
+                  >
+                    <CardHeader>
+                      <CardTitle className="text-lg">{session.title}</CardTitle>
+                      <CardDescription>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Clock className="w-4 h-4" />
+                          <span>{new Date(session.createdAt).toLocaleString()}</span>
+                        </div>
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2 text-sm">
+                        <Users className="w-4 h-4 text-blue-600" />
+                        <span className="text-2xl font-bold text-blue-600">{session.attendanceCount}</span>
+                        <span className="text-gray-600">attendees</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Attendees List View */}
+        {view === 'attendees' && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              {selectedSession?.title} - Attendees
+            </h2>
+
+            {attendeesLoading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : attendees.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-500">No attendees found for this session.</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Attendees List ({attendees.length})</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {attendees.map((attendee, index) => (
+                      <div
+                        key={attendee.id}
+                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                            <span className="text-blue-600 font-semibold">
+                              {attendee.name.charAt(0).toUpperCase()}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{attendee.name}</p>
+                            <p className="text-sm text-gray-500">{attendee.email}</p>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {new Date(attendee.markedAt).toLocaleString()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Create Event Dialog */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
@@ -354,9 +912,9 @@ export default function AdminDashboard() {
             .dialog-form input,
             .dialog-form textarea,
             .dialog-form [data-radix-select-trigger] {
-              font-size: 16px !important; /* Prevents zoom on iOS */
+              font-size: 16px !important;
               padding: 12px !important;
-              min-height: 48px !important; /* Touch target size */
+              min-height: 48px !important;
             }
             
             .dialog-form textarea {
@@ -369,7 +927,6 @@ export default function AdminDashboard() {
             }
           }
           
-          /* Scrollbar styling */
           .dialog-form-scroll::-webkit-scrollbar {
             width: 4px;
           }

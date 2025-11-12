@@ -10,6 +10,7 @@ const userRoutes = require('./routes/usersRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const eventsRoutes = require('./routes/eventsRoutes');
 const authRoutes = require('./routes/auth');
+const registrationRoutes = require('./routes/registrationRoutes');
 
 // Middleware
 app.use(cors());
@@ -38,6 +39,8 @@ app.get('/', (req, res) => {
 app.use('/users', userRoutes);
 app.use('/admin', adminRoutes);
 app.use('/admin/events', eventsRoutes);
+app.use('/events', eventsRoutes);
+app.use('/registrations', registrationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

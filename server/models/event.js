@@ -17,6 +17,14 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.DATE,
       allowNull: false
     },
+    startDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
+    endDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true
+    },
     organizerId: {
       type: DataTypes.INTEGER,
       allowNull: false
@@ -25,6 +33,11 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.STRING,
       allowNull: false,
       validate: { isEmail: true }
+    },
+    certificateEnabled: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false
     }
   }, {
     timestamps: true,
@@ -34,6 +47,8 @@ module.exports = (sequelize, DataTypes) => {
   Event.associate = (models) => {
     Event.belongsTo(models.User, { foreignKey: 'organizerId' });
     Event.hasMany(models.Registration, { foreignKey: 'eventId' });
+    Event.hasMany(models.EventDay, { foreignKey: 'eventId', as: 'EventDays' });
+    Event.hasMany(models.EventCertificateRequirement, { foreignKey: 'eventId', as: 'CertificateRequirements' });
   };
 
   return Event;

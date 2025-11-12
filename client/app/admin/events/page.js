@@ -1,76 +1,16 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, Calendar, MapPin, User, Clock, Eye, Edit, Trash2, AlertCircle, Filter, X } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, User, Clock, Eye, Edit, Trash2, AlertCircle, Filter, X, LayoutDashboard, CalendarDays } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-// Mock data - replace with your actual API calls
-const mockEvents = [
-  {
-    id: 1,
-    name: "Tech Conference 2024",
-    description: "Annual technology conference featuring the latest innovations in AI, blockchain, and web development. Join industry leaders and innovators for two days of inspiring talks, networking, and hands-on workshops.",
-    location: "San Francisco Convention Center",
-    dateTime: "2024-03-15T09:00",
-    status: "active",
-    organizerId: 101,
-    creatorEmail: "john@techconf.com",
-    attendees: 250,
-    category: "Technology"
-  },
-  {
-    id: 2,
-    name: "Marketing Summit",
-    description: "Explore the future of digital marketing with expert speakers and interactive sessions covering social media, SEO, content marketing, and analytics.",
-    location: "Downtown Convention Hall",
-    dateTime: "2024-04-20T10:00",
-    status: "active",
-    organizerId: 102,
-    creatorEmail: "sarah@marketingsummit.com",
-    attendees: 180,
-    category: "Business"
-  },
-  {
-    id: 3,
-    name: "Art Exhibition Opening",
-    description: "Contemporary art exhibition featuring local and international artists. Experience unique installations, paintings, and sculptures in our newly renovated gallery space.",
-    location: "Modern Art Gallery",
-    dateTime: "2024-05-10T18:00",
-    status: "active",
-    organizerId: 103,
-    creatorEmail: "curator@modernart.com",
-    attendees: 120,
-    category: "Arts"
-  },
-  {
-    id: 4,
-    name: "Startup Pitch Competition",
-    description: "Young entrepreneurs showcase their innovative ideas to a panel of investors and industry experts. Network with fellow entrepreneurs and witness the next big startup ideas.",
-    location: "Innovation Hub",
-    dateTime: "2024-02-28T14:00",
-    status: "completed",
-    organizerId: 104,
-    creatorEmail: "events@innovationhub.com",
-    attendees: 95,
-    category: "Business"
-  },
-  {
-    id: 5,
-    name: "Music Festival",
-    description: "Three-day outdoor music festival featuring indie, rock, and electronic artists from around the world. Food trucks, art installations, and camping available.",
-    location: "Riverside Park",
-    dateTime: "2024-06-15T16:00",
-    status: "active",
-    organizerId: 105,
-    creatorEmail: "info@musicfest.com",
-    attendees: 500,
-    category: "Entertainment"
-  }
-];
+// API base URL
+const API_BASE_URL = 'http://localhost:5000';
 
 const EventsManagementPage = () => {
-  const [events, setEvents] = useState(mockEvents);
-  const [user, setUser] = useState(null)
-  const [filteredEvents, setFilteredEvents] = useState(mockEvents);
+  const [events, setEvents] = useState([]);
+  const [user, setUser] = useState(null);
+  const [filteredEvents, setFilteredEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -78,7 +18,17 @@ const EventsManagementPage = () => {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
   const [createLoading, setCreateLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [errors, setErrors] = useState({});
+  
+  // Statistics state variables
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [totalEvents, setTotalEvents] = useState(0);
+  const [activeEvents, setActiveEvents] = useState(0);
+  const [totalRegistrations, setTotalRegistrations] = useState(0);
+
+  const router = useRouter();
 
   // Event form state
   const [eventForm, setEventForm] = useState({
@@ -86,11 +36,129 @@ const EventsManagementPage = () => {
     description: '',
     location: '',
     dateTime: '',
+    startDate: '',
+    endDate: '',
     status: 'active',
     organizerId: '',
     creatorEmail: '',
-    category: 'Business'
+    certificateEnabled: false,
+    certificateSessionIds: [], // Array of { dayIndex, sessionIndex }
+    days: [] // Array of { dayDate, title, sessions: [{ title }] }
   });
+
+  // API Functions
+  const fetchEvents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        setEvents(data.events);
+        setFilteredEvents(data.events);
+      } else {
+        console.error('Failed to fetch events:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    }
+  };
+
+  const createEvent = async (eventData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(eventData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchEvents(); // Refresh events list
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      console.error('Error creating event:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const updateEvent = async (eventId, eventData) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events/${eventId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(eventData)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchEvents(); // Refresh events list
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const deleteEvent = async (eventId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events/${eventId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        await fetchEvents(); // Refresh events list
+        return { success: true };
+      } else {
+        return { success: false, error: data.error };
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      return { success: false, error: error.message };
+    }
+  };
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -139,6 +207,9 @@ const EventsManagementPage = () => {
           ...prev,
           creatorEmail: userData.email || ''
         }));
+
+        // Fetch events after successful authentication
+        await fetchEvents();
       } catch (error) {
         console.error('Error parsing user data:', error);
         localStorage.removeItem('token');
@@ -166,7 +237,7 @@ const EventsManagementPage = () => {
         event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
         event.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        event.category.toLowerCase().includes(searchTerm.toLowerCase())
+        event.creatorEmail.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -193,12 +264,86 @@ const EventsManagementPage = () => {
       description: '',
       location: '',
       dateTime: '',
+      startDate: '',
+      endDate: '',
       status: 'active',
       organizerId: '',
       creatorEmail: '',
-      category: 'Business'
+      certificateEnabled: false,
+      certificateSessionIds: [],
+      days: []
     });
     setErrors({});
+  };
+
+  // Helper functions for managing days and sessions
+  const addDay = () => {
+    setEventForm({
+      ...eventForm,
+      days: [...eventForm.days, { dayDate: '', title: '', sessions: [] }]
+    });
+  };
+
+  const removeDay = (dayIndex) => {
+    setEventForm({
+      ...eventForm,
+      days: eventForm.days.filter((_, index) => index !== dayIndex)
+    });
+  };
+
+  const updateDay = (dayIndex, field, value) => {
+    const updatedDays = [...eventForm.days];
+    updatedDays[dayIndex] = { ...updatedDays[dayIndex], [field]: value };
+    setEventForm({ ...eventForm, days: updatedDays });
+  };
+
+  const addSession = (dayIndex) => {
+    const updatedDays = [...eventForm.days];
+    updatedDays[dayIndex].sessions = [...updatedDays[dayIndex].sessions, { title: '' }];
+    setEventForm({ ...eventForm, days: updatedDays });
+  };
+
+  const removeSession = (dayIndex, sessionIndex) => {
+    const updatedDays = [...eventForm.days];
+    updatedDays[dayIndex].sessions = updatedDays[dayIndex].sessions.filter((_, index) => index !== sessionIndex);
+    setEventForm({ ...eventForm, days: updatedDays });
+  };
+
+  const updateSession = (dayIndex, sessionIndex, value) => {
+    const updatedDays = [...eventForm.days];
+    updatedDays[dayIndex].sessions[sessionIndex].title = value;
+    setEventForm({ ...eventForm, days: updatedDays });
+  };
+
+  // Toggle certificate session selection
+  const toggleCertificateSession = (dayIndex, sessionIndex) => {
+    const certKey = { dayIndex, sessionIndex };
+    const isSelected = eventForm.certificateSessionIds.some(
+      id => id.dayIndex === dayIndex && id.sessionIndex === sessionIndex
+    );
+    
+    if (isSelected) {
+      // Remove from selection
+      setEventForm({
+        ...eventForm,
+        certificateSessionIds: eventForm.certificateSessionIds.filter(
+          id => !(id.dayIndex === dayIndex && id.sessionIndex === sessionIndex)
+        )
+      });
+    } else {
+      // Add to selection
+      setEventForm({
+        ...eventForm,
+        certificateSessionIds: [...eventForm.certificateSessionIds, certKey]
+      });
+    }
+  };
+
+  // Check if session is selected for certificate
+  const isSessionSelectedForCertificate = (dayIndex, sessionIndex) => {
+    return eventForm.certificateSessionIds.some(
+      id => id.dayIndex === dayIndex && id.sessionIndex === sessionIndex
+    );
   };
 
   // Validate form
@@ -211,6 +356,20 @@ const EventsManagementPage = () => {
     if (!eventForm.creatorEmail.trim()) newErrors.creatorEmail = 'Creator email is required';
     else if (!/\S+@\S+\.\S+/.test(eventForm.creatorEmail)) newErrors.creatorEmail = 'Invalid email format';
     
+    // Validate days
+    if (eventForm.days.length > 0) {
+      eventForm.days.forEach((day, dayIndex) => {
+        if (!day.dayDate) {
+          newErrors[`day_${dayIndex}_date`] = 'Day date is required';
+        }
+        day.sessions.forEach((session, sessionIndex) => {
+          if (!session.title.trim()) {
+            newErrors[`day_${dayIndex}_session_${sessionIndex}`] = 'Session title is required';
+          }
+        });
+      });
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -222,19 +381,43 @@ const EventsManagementPage = () => {
     
     setCreateLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newEvent = {
-      ...eventForm,
-      id: Date.now(),
-      attendees: 0
-    };
-    
-    setEvents([newEvent, ...events]);
-    setCreateLoading(false);
-    setIsCreateOpen(false);
-    resetForm();
+    try {
+      // Prepare event data with days and sessions
+      const eventData = {
+        name: eventForm.name,
+        description: eventForm.description,
+        location: eventForm.location,
+        dateTime: eventForm.dateTime,
+        startDate: eventForm.startDate || null,
+        endDate: eventForm.endDate || null,
+        status: eventForm.status,
+        organizerId: eventForm.organizerId,
+        creatorEmail: eventForm.creatorEmail,
+        certificateEnabled: eventForm.certificateEnabled,
+        certificateSessionIds: eventForm.certificateEnabled ? eventForm.certificateSessionIds : [],
+        days: eventForm.days.map(day => ({
+          dayDate: day.dayDate,
+          title: day.title || null,
+          sessions: day.sessions.map(session => ({
+            title: session.title
+          }))
+        }))
+      };
+      
+      const result = await createEvent(eventData);
+      
+      if (result.success) {
+        setIsCreateOpen(false);
+        resetForm();
+      } else {
+        console.error('Failed to create event:', result.error);
+        // You could add a toast notification here
+      }
+    } catch (error) {
+      console.error('Error creating event:', error);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   // Handle edit event
@@ -244,17 +427,43 @@ const EventsManagementPage = () => {
     
     setCreateLoading(true);
     
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const updatedEvents = events.map(event =>
-      event.id === selectedEvent.id ? { ...eventForm, id: selectedEvent.id, attendees: selectedEvent.attendees } : event
-    );
-    
-    setEvents(updatedEvents);
-    setCreateLoading(false);
-    setIsEditOpen(false);
-    resetForm();
+    try {
+      // Prepare event data with days and sessions
+      const eventData = {
+        name: eventForm.name,
+        description: eventForm.description,
+        location: eventForm.location,
+        dateTime: eventForm.dateTime,
+        startDate: eventForm.startDate || null,
+        endDate: eventForm.endDate || null,
+        status: eventForm.status,
+        organizerId: eventForm.organizerId,
+        creatorEmail: eventForm.creatorEmail,
+        certificateEnabled: eventForm.certificateEnabled,
+        certificateSessionIds: eventForm.certificateEnabled ? eventForm.certificateSessionIds : [],
+        days: eventForm.days.map(day => ({
+          dayDate: day.dayDate,
+          title: day.title || null,
+          sessions: day.sessions.map(session => ({
+            title: session.title
+          }))
+        }))
+      };
+      
+      const result = await updateEvent(selectedEvent.id, eventData);
+      
+      if (result.success) {
+        setIsEditOpen(false);
+        resetForm();
+      } else {
+        console.error('Failed to update event:', result.error);
+        // You could add a toast notification here
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+    } finally {
+      setCreateLoading(false);
+    }
   };
 
   // Open create dialog
@@ -264,31 +473,119 @@ const EventsManagementPage = () => {
   };
 
   // Open view dialog
-  const openViewDialog = (event) => {
-    setSelectedEvent(event);
+  const openViewDialog = async (event) => {
+    // Fetch full event details with days and sessions
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events/${event.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedEvent(data.event);
+      } else {
+        // Fallback to basic event data
+        setSelectedEvent(event);
+      }
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      // Fallback to basic event data
+      setSelectedEvent(event);
+    }
+    
     setIsViewOpen(true);
   };
 
   // Open edit dialog
-  const openEditDialog = (event) => {
+  const openEditDialog = async (event) => {
     setSelectedEvent(event);
-    setEventForm({
-      name: event.name,
-      description: event.description,
-      location: event.location,
-      dateTime: event.dateTime,
-      status: event.status,
-      organizerId: event.organizerId.toString(),
-      creatorEmail: event.creatorEmail,
-      category: event.category
-    });
+    
+    // Fetch event with days and sessions
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/events/${event.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        const eventData = data.event;
+        
+        // Format days and sessions if they exist
+        const days = eventData.days || [];
+        
+        setEventForm({
+          name: event.name,
+          description: event.description || '',
+          location: event.location || '',
+          dateTime: event.dateTime ? new Date(event.dateTime).toISOString().slice(0, 16) : '',
+          startDate: event.startDate || '',
+          endDate: event.endDate || '',
+          status: event.status,
+          organizerId: event.organizerId.toString(),
+          creatorEmail: event.creatorEmail,
+          days: days.map(day => ({
+            dayDate: day.dayDate || '',
+            title: day.title || '',
+            sessions: (day.sessions || []).map(session => ({ title: session.title || '' }))
+          }))
+        });
+      } else {
+        // Fallback to basic event data
+        setEventForm({
+          name: event.name,
+          description: event.description || '',
+          location: event.location || '',
+          dateTime: event.dateTime ? new Date(event.dateTime).toISOString().slice(0, 16) : '',
+          startDate: event.startDate || '',
+          endDate: event.endDate || '',
+          status: event.status,
+          organizerId: event.organizerId.toString(),
+          creatorEmail: event.creatorEmail,
+          days: []
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching event details:', error);
+      // Fallback to basic event data
+      setEventForm({
+        name: event.name,
+        description: event.description || '',
+        location: event.location || '',
+        dateTime: event.dateTime ? new Date(event.dateTime).toISOString().slice(0, 16) : '',
+        startDate: event.startDate || '',
+        endDate: event.endDate || '',
+        status: event.status,
+        organizerId: event.organizerId.toString(),
+        creatorEmail: event.creatorEmail,
+        days: []
+      });
+    }
+    
     setIsEditOpen(true);
   };
 
   // Delete event
-  const handleDeleteEvent = (eventId) => {
+  const handleDeleteEvent = async (eventId) => {
     if (window.confirm('Are you sure you want to delete this event?')) {
-      setEvents(events.filter(event => event.id !== eventId));
+      try {
+        const result = await deleteEvent(eventId);
+        if (!result.success) {
+          console.error('Failed to delete event:', result.error);
+          // You could add a toast notification here
+        }
+      } catch (error) {
+        console.error('Error deleting event:', error);
+      }
     }
   };
 
@@ -302,13 +599,23 @@ const EventsManagementPage = () => {
               <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Events Management</h1>
               <p className="text-gray-600 mt-1">Manage and organize your events</p>
             </div>
-            <button
-              onClick={openCreateDialog}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              Create Event
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => router.push('/admin/dashboard')}
+                className="flex items-center justify-center gap-2 border border-gray-300 text-gray-700 hover:bg-gray-50 px-4 py-2 rounded-lg transition-colors duration-200"
+                title="Go to Dashboard"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Dashboard
+              </button>
+              <button
+                onClick={openCreateDialog}
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 shadow-sm hover:shadow-md"
+              >
+                <Plus className="w-4 h-4" />
+                Create Event
+              </button>
+            </div>
           </div>
         </div>
 
@@ -319,7 +626,7 @@ const EventsManagementPage = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search events by name, description, location, or category..."
+                placeholder="Search events by name, description, location, or creator email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
@@ -342,7 +649,13 @@ const EventsManagementPage = () => {
 
         {/* Events List */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredEvents.length === 0 ? (
+          {loading ? (
+            <div className="col-span-full text-center py-12">
+              <div className="w-16 h-16 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4"></div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Loading events...</h3>
+              <p className="text-gray-500">Please wait while we fetch your events</p>
+            </div>
+          ) : filteredEvents.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
@@ -389,10 +702,7 @@ const EventsManagementPage = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">
-                      {event.category}
-                    </span>
+                  <div className="flex items-center justify-end pt-4 border-t border-gray-100">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => openViewDialog(event)}
@@ -507,6 +817,32 @@ const EventsManagementPage = () => {
                     </div>
 
                     <div className="space-y-2">
+                      <label htmlFor="startDate" className="text-sm font-medium text-gray-700 block">
+                        Start Date
+                      </label>
+                      <input
+                        id="startDate"
+                        type="date"
+                        value={eventForm.startDate}
+                        onChange={(e) => setEventForm({ ...eventForm, startDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label htmlFor="endDate" className="text-sm font-medium text-gray-700 block">
+                        End Date
+                      </label>
+                      <input
+                        id="endDate"
+                        type="date"
+                        value={eventForm.endDate}
+                        onChange={(e) => setEventForm({ ...eventForm, endDate: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
                       <label htmlFor="status" className="text-sm font-medium text-gray-700 block">
                         Status
                       </label>
@@ -561,26 +897,6 @@ const EventsManagementPage = () => {
                       )}
                     </div>
 
-                    <div className="space-y-2">
-                      <label htmlFor="category" className="text-sm font-medium text-gray-700 block">
-                        Category
-                      </label>
-                      <select
-                        id="category"
-                        value={eventForm.category}
-                        onChange={(e) => setEventForm({ ...eventForm, category: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      >
-                        <option value="Business">Business</option>
-                        <option value="Technology">Technology</option>
-                        <option value="Arts">Arts</option>
-                        <option value="Entertainment">Entertainment</option>
-                        <option value="Education">Education</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Health">Health</option>
-                        <option value="Other">Other</option>
-                      </select>
-                    </div>
                   </div>
 
                   <div className="space-y-2 lg:col-span-2">
@@ -595,6 +911,159 @@ const EventsManagementPage = () => {
                       rows={4}
                       className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 resize-y"
                     />
+                  </div>
+
+                  {/* Certificate Section */}
+                  <div className="lg:col-span-2 space-y-4 border-t border-gray-200 pt-6">
+                    <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <input
+                        type="checkbox"
+                        id="certificateEnabled"
+                        checked={eventForm.certificateEnabled}
+                        onChange={(e) => {
+                          setEventForm({
+                            ...eventForm,
+                            certificateEnabled: e.target.checked,
+                            certificateSessionIds: e.target.checked ? eventForm.certificateSessionIds : []
+                          });
+                        }}
+                        className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label htmlFor="certificateEnabled" className="text-sm font-medium text-gray-900 cursor-pointer">
+                        Enable Certificate for this Event
+                      </label>
+                    </div>
+                    {eventForm.certificateEnabled && (
+                      <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                        <p className="text-sm text-yellow-800">
+                          <strong>Note:</strong> Select sessions (checkboxes) that users must attend to be eligible for certification.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Event Days and Sessions Section */}
+                  <div className="lg:col-span-2 space-y-4 border-t border-gray-200 pt-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CalendarDays className="w-5 h-5 text-gray-700" />
+                        <h3 className="text-lg font-semibold text-gray-900">Event Days & Sessions</h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={addDay}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors duration-200 text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Day
+                      </button>
+                    </div>
+
+                    {eventForm.days.length === 0 && (
+                      <p className="text-sm text-gray-500 italic">No days added yet. Click "Add Day" to create event days with sessions.</p>
+                    )}
+
+                    {eventForm.days.map((day, dayIndex) => (
+                      <div key={dayIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                        <div className="flex items-start justify-between mb-4">
+                          <h4 className="text-md font-medium text-gray-900">Day {dayIndex + 1}</h4>
+                          <button
+                            type="button"
+                            onClick={() => removeDay(dayIndex)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                            title="Remove Day"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 block">
+                              Day Date *
+                            </label>
+                            <input
+                              type="date"
+                              value={day.dayDate}
+                              onChange={(e) => updateDay(dayIndex, 'dayDate', e.target.value)}
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            />
+                            {errors[`day_${dayIndex}_date`] && (
+                              <p className="text-red-500 text-sm flex items-start gap-2 mt-1">
+                                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                <span>{errors[`day_${dayIndex}_date`]}</span>
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium text-gray-700 block">
+                              Day Title (e.g., "Day 1 - AI Summit")
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Day title (optional)"
+                              value={day.title}
+                              onChange={(e) => updateDay(dayIndex, 'title', e.target.value)}
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Sessions for this day */}
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-sm font-medium text-gray-700">Sessions</label>
+                            <button
+                              type="button"
+                              onClick={() => addSession(dayIndex)}
+                              className="flex items-center gap-1 px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded transition-colors duration-200 text-sm"
+                            >
+                              <Plus className="w-3 h-3" />
+                              Add Session
+                            </button>
+                          </div>
+
+                          {day.sessions.length === 0 && (
+                            <p className="text-xs text-gray-500 italic">No sessions added for this day.</p>
+                          )}
+
+                          {day.sessions.map((session, sessionIndex) => (
+                            <div key={sessionIndex} className="flex items-center gap-2 bg-white p-3 rounded border border-gray-200">
+                              {eventForm.certificateEnabled && (
+                                <input
+                                  type="checkbox"
+                                  checked={isSessionSelectedForCertificate(dayIndex, sessionIndex)}
+                                  onChange={() => toggleCertificateSession(dayIndex, sessionIndex)}
+                                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                  title="Required for certificate"
+                                />
+                              )}
+                              <input
+                                type="text"
+                                placeholder="Session title"
+                                value={session.title}
+                                onChange={(e) => updateSession(dayIndex, sessionIndex, e.target.value)}
+                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => removeSession(dayIndex, sessionIndex)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                                title="Remove Session"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                              {errors[`day_${dayIndex}_session_${sessionIndex}`] && (
+                                <p className="text-red-500 text-xs">
+                                  {errors[`day_${dayIndex}_session_${sessionIndex}`]}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </form>
               </div>
@@ -669,9 +1138,6 @@ const EventsManagementPage = () => {
                         }`}>
                           {selectedEvent.status}
                         </span>
-                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
-                          {selectedEvent.category}
-                        </span>
                       </div>
                     </div>
                   </div>
@@ -731,8 +1197,67 @@ const EventsManagementPage = () => {
                         <h4 className="text-sm font-medium text-gray-700 mb-2">Event ID</h4>
                         <p className="text-gray-900 font-mono text-sm">{selectedEvent.id}</p>
                       </div>
+
+                      {selectedEvent.startDate && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">Start Date</h4>
+                          <p className="text-gray-900">{new Date(selectedEvent.startDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
+
+                      {selectedEvent.endDate && (
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-2">End Date</h4>
+                          <p className="text-gray-900">{new Date(selectedEvent.endDate).toLocaleDateString()}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {/* Event Days and Sessions */}
+                  {selectedEvent.days && selectedEvent.days.length > 0 && (
+                    <div className="border-t border-gray-200 pt-6">
+                      <div className="flex items-center gap-2 mb-4">
+                        <CalendarDays className="w-5 h-5 text-gray-700" />
+                        <h4 className="text-lg font-semibold text-gray-900">Event Days & Sessions</h4>
+                      </div>
+                      <div className="space-y-4">
+                        {selectedEvent.days.map((day, dayIndex) => (
+                          <div key={dayIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                            <div className="mb-3">
+                              <h5 className="font-medium text-gray-900 mb-1">
+                                {day.title || `Day ${dayIndex + 1}`}
+                              </h5>
+                              <p className="text-sm text-gray-600">
+                                {day.dayDate ? new Date(day.dayDate).toLocaleDateString('en-US', {
+                                  weekday: 'long',
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric'
+                                }) : 'Date not set'}
+                              </p>
+                            </div>
+                            {day.sessions && day.sessions.length > 0 && (
+                              <div className="mt-3">
+                                <h6 className="text-sm font-medium text-gray-700 mb-2">Sessions:</h6>
+                                <ul className="space-y-2">
+                                  {day.sessions.map((session, sessionIndex) => (
+                                    <li key={sessionIndex} className="flex items-center gap-2 text-sm text-gray-700 bg-white p-2 rounded border border-gray-200">
+                                      <Clock className="w-4 h-4 text-gray-500" />
+                                      <span>{session.title}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                            {(!day.sessions || day.sessions.length === 0) && (
+                              <p className="text-xs text-gray-500 italic mt-2">No sessions for this day</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

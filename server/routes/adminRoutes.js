@@ -1,6 +1,6 @@
 const express = require('express');
 const { Admin, User, Event, Registration } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, authenticateAdminToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
@@ -95,6 +95,24 @@ router.post('/login', async (req, res) => {
         error: error.message 
       });
     }
+});
+
+// Get all users
+router.get('/allUsers', authenticateAdminToken,  async (req, res) => {
+  try {
+    // console.log("----")
+    const user = await User.findAll({
+      row: true
+    });
+    res.json({
+        email : user.personalEmail,
+        name: user.name,
+        mobileNo: user.mobileNo,
+        role: user.role
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

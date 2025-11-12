@@ -28,12 +28,19 @@ module.exports = (sequelize, DataTypes) => {
     }
   }, {
     timestamps: true,
-    tableName: 'registrations'
+    tableName: 'registrations',
+    indexes: [
+      {
+        unique: true,
+        fields: ['eventId', 'userId']
+      }
+    ]
   });
 
   Registration.associate = (models) => {
-    Registration.belongsTo(models.Event, { foreignKey: 'eventId' });
-    Registration.belongsTo(models.User, { foreignKey: 'userId' });
+    Registration.belongsTo(models.Event, { foreignKey: 'eventId', as: 'Event' });
+    Registration.belongsTo(models.User, { foreignKey: 'userId', as: 'User' });
+    Registration.hasMany(models.Attendance, { foreignKey: 'registrationId', as: 'Attendances' });
   };
 
   return Registration;

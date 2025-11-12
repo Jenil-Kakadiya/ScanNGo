@@ -1,6 +1,6 @@
 const express = require('express');
-const { User } = require('../models');
-const { authenticateToken } = require('../middleware/auth');
+const { User, Registration, Event } = require('../models');
+const { authenticateToken, authenticateAdminToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const passport = require("passport");
@@ -8,7 +8,7 @@ const GoogleStrategy = require("passport-google-oauth20").Strategy;
 
 const router = express.Router();
 
-// Get all users
+
 router.get('/user', authenticateToken,  async (req, res) => {
   try {
     // console.log("----")
@@ -22,6 +22,49 @@ router.get('/user', authenticateToken,  async (req, res) => {
         role: user.role
     });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get user dashboard data with stats
+router.get('/dashboard', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id);
+    
+    // Get user's registration count
+    const userRegistrations = await Registration.count({ 
+      where: { userId: req.user.id } 
+    });
+    
+    // Get user's attended events count
+    const attendedEvents = await Registration.count({ 
+      where: { 
+        userId: req.user.id,
+        checkedIn: true 
+      } 
+    });
+
+    // Get total active events (for reference)
+    const totalActiveEvents = await Event.count({ 
+      where: { status: 'active' } 
+    });
+
+    res.json({
+      email: user.personalEmail,
+      name: user.name,
+      mobileNo: user.mobileNo,
+      role: user.role,
+      stats: {
+        totalEvents: totalActiveEvents,
+        activeEvents: totalActiveEvents,
+        totalRegistrations: userRegistrations,
+        attendedEvents: attendedEvents,
+        totalUsers: 0, // Not relevant for regular users
+        activeUsers: 0 // Not relevant for regular users
+      }
+    });
+  } catch (error) {
+    console.error('User dashboard data error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -55,16 +98,17 @@ router.post('/register', async (req, res) => {
       });
     }
     console.log("-------2")
-    const hashedPassword = await bcrypt.hash(password, 10);
-
+    // Password will be hashed automatically by User model's beforeCreate hook
+    
     const user = await User.create({ 
       name, 
       personalEmail : email, 
       mobileNo,
       universityEmail : '',
-      password: hashedPassword,
+      password: password, // Pass plain password, hook will hash it
       batch: '2022-2026',
-      role 
+      role,
+      isActive: 1 
     });
     // console.log("-------3")
     const token = jwt.sign(
@@ -91,15 +135,25 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
+    
+    // Trim whitespace and validate
+    const trimmedEmail = email?.trim();
+    const trimmedPassword = password?.trim();
+    
+    if (!trimmedEmail || !trimmedPassword) {
       return res.status(400).json({ 
         success: false,
         error: 'Email and password are required' 
       });
     }
 
-    const user = await User.findOne({ where: { personalEmail: email } });
+    const user = await User.findOne({ 
+      where: { 
+        personalEmail: trimmedEmail.toLowerCase(), 
+        isActive: 1 
+      } 
+    });
+    
     if (!user) {
       return res.status(400).json({ 
         success: false,
@@ -107,7 +161,17 @@ router.post('/login', async (req, res) => {
       });
     }
     
-    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    // Check if password field exists
+    if (!user.password) {
+      return res.status(500).json({ 
+        success: false,
+        error: 'Password field not found in user record' 
+      });
+    }
+    
+    // Compare passwords using the model method or bcrypt directly
+    const isPasswordCorrect = await bcrypt.compare(trimmedPassword, user.password);
+    
     if (!isPasswordCorrect) {
       return res.status(400).json({ 
         success: false,
@@ -181,7 +245,8 @@ async function findOrCreateUser(email, name) {
       personalEmail: email,
       role: 'user',
       password: 'google_oauth_user', // Placeholder password, won't be used
-      mobileNo: '9999999999', // Placeholder mobile number, won't be used
+      mobileNo: '9999999999',
+      isActive: 1 // Placeholder mobile number, won't be used
     });
 
     return user;
@@ -299,5 +364,82 @@ router.get("/google/callback",
 //     res.status(500).json({ error: error.message });
 //   }
 // });
+
+// Admin: Get all users with registration stats and details
+router.get('/', authenticateAdminToken, async (req, res) => {
+  try {
+    const users = await User.findAll({
+      include: [
+        {
+          model: Registration,
+          as: 'Registrations',
+          attributes: ['id', 'eventId', 'status', 'checkedIn', 'createdAt'],
+          include: [
+            {
+              model: Event,
+              as: 'Event',
+              attributes: ['id', 'name', 'status', 'dateTime', 'location']
+            }
+          ]
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const result = users.map((u) => {
+      const regs = Array.isArray(u.Registrations) ? u.Registrations : [];
+      const registrationsCount = regs.length;
+      const attendedCount = regs.filter(r => r.checkedIn === true).length;
+      const activeRegistrationsCount = regs.filter(r => r.status === 'confirmed').length;
+      return {
+        id: u.id,
+        name: u.name,
+        personalEmail: u.personalEmail,
+        mobileNo: u.mobileNo,
+        department: u.department,
+        batch: u.batch,
+        role: u.role,
+        isActive: u.isActive,
+        registrationsCount,
+        attendedCount,
+        activeRegistrationsCount,
+        registrations: regs.map(r => ({
+          id: r.id,
+          status: r.status,
+          checkedIn: r.checkedIn,
+          createdAt: r.createdAt,
+          event: r.Event ? {
+            id: r.Event.id,
+            name: r.Event.name,
+            status: r.Event.status,
+            dateTime: r.Event.dateTime,
+            location: r.Event.location
+          } : null
+        }))
+      };
+    });
+
+    res.status(200).json({ success: true, users: result });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Admin: Disable a user
+router.put('/:id/disable', authenticateAdminToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findByPk(id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    await user.update({ isActive: 0 });
+    res.status(200).json({ success: true, message: 'User disabled successfully' });
+  } catch (error) {
+    console.error('Error disabling user:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 module.exports = router;

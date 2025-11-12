@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Head from "next/head";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -159,9 +160,31 @@ export default function AuthPage() {
       // console.log('Response data:', data);
 
       if (response.ok && data.success) {
-        // Store user data and token in localStorage
-        localStorage.setItem('user', JSON.stringify(data.user));
-        localStorage.setItem('token', data.token);
+        // Validate that token exists
+        if (!data.token) {
+          setErrors({ general: 'Token not received from server. Please try again.' });
+          setIsLoading(false);
+          return;
+        }
+
+        // Store user data and token in localStorage synchronously
+        try {
+          localStorage.setItem('user', JSON.stringify(data.user));
+          localStorage.setItem('token', data.token);
+          
+          // Verify token was stored
+          const storedToken = localStorage.getItem('token');
+          if (!storedToken || storedToken !== data.token) {
+            setErrors({ general: 'Failed to store authentication token. Please try again.' });
+            setIsLoading(false);
+            return;
+          }
+        } catch (storageError) {
+          console.error('localStorage error:', storageError);
+          setErrors({ general: 'Failed to save authentication data. Please check browser settings.' });
+          setIsLoading(false);
+          return;
+        }
         
         // Show success message briefly
         let successMessage = '';
@@ -178,20 +201,23 @@ export default function AuthPage() {
         // Set redirecting state to keep button disabled
         setIsRedirecting(true);
         
-        // Force redirect after 2 seconds
+        // Force redirect after 1 second (reduced delay for better UX)
         setTimeout(() => {
-          // console.log('Redirecting to dashboard...');
-          // console.log('User role:', data.user.role);
-          // console.log(data.user);
-          // console.log(data.user.role);
-          if (data.user.role === 'admin') {
-            // console.log('Redirecting to admin dashboard');
+          // Verify token is still there before redirect
+          const verifyToken = localStorage.getItem('token');
+          if (!verifyToken) {
+            setErrors({ general: 'Token lost during redirect. Please login again.' });
+            setIsRedirecting(false);
+            setIsLoading(false);
+            return;
+          }
+
+          if (data.user && data.user.role === 'admin') {
             window.location.href = '/admin/dashboard';
           } else {
-            // console.log('Redirecting to user dashboard');
             window.location.href = '/dashboard';
           }
-        }, 2000);
+        }, 1000);
         
       } else {
         // Handle error response

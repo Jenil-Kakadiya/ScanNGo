@@ -1,14 +1,22 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar, MapPin, User, LogOut, Eye, UserPlus, Sparkles, Clock, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, User, LogOut, Eye, UserPlus, Sparkles, CheckCircle, AlertCircle, FolderKanban, QrCode, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useRouter } from 'next/navigation';
+
+// Dynamic import for QR code component (client-side only)
+const QRCodeSVG = dynamic(() => import("react-qr-code"), {
+  ssr: false,
+  loading: () => <div className="w-64 h-64 bg-gray-200 animate-pulse rounded"></div>,
+});
 
 export default function UserDashboard() {
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
@@ -25,57 +33,17 @@ export default function UserDashboard() {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const [isQRCodeOpen, setIsQRCodeOpen] = useState(false);
+  const [selectedVerificationCode, setSelectedVerificationCode] = useState(null);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [logoutLoading, setLogoutLoading] = useState(false);
   const [accountLoading, setAccountLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubLoading, setIsSubLoading] = useState(false);
 
-  const upcomingEvents = useMemo(() => {
-    return [
-      { 
-        id: '1', 
-        title: 'Tech Conference 2025', 
-        date: '2025-09-12', 
-        location: 'Innovation Hall A', 
-        description: 'A premier conference showcasing cutting-edge technology and innovation. Join industry leaders and pioneers as they share insights on the future of tech.',
-        category: 'Technology',
-        attendees: 250
-      },
-      { 
-        id: '2', 
-        title: 'Design Summit', 
-        date: '2025-10-03', 
-        location: 'Creative Hub B', 
-        description: 'An exclusive summit for product designers and UX professionals. Explore the latest design trends and methodologies.',
-        category: 'Design',
-        attendees: 180
-      },
-      { 
-        id: '3', 
-        title: 'AI Workshop', 
-        date: '2025-08-30', 
-        location: 'Future Lab 2', 
-        description: 'Hands-on workshop focusing on practical AI implementation and machine learning techniques.',
-        category: 'AI/ML',
-        attendees: 120
-      },
-    ];
-  }, []);
-
-  const registeredEvents = useMemo(() => {
-    return [
-      { 
-        id: 'r1', 
-        title: 'Web Dev Bootcamp', 
-        date: '2025-07-22', 
-        location: 'Development Center 101', 
-        description: 'Intensive bootcamp covering modern web development frameworks and best practices.',
-        category: 'Development',
-        status: 'Confirmed'
-      },
-    ];
-  }, []);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [registeredEvents, setRegisteredEvents] = useState([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -133,6 +101,80 @@ export default function UserDashboard() {
     }
   }, []);
 
+  // Fetch all events
+  const fetchAllEvents = async () => {
+    try {
+      setEventsLoading(true);
+      const response = await fetch('http://localhost:5000/events/public', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Transform events to match the expected format
+        const transformedEvents = data.events.map(event => ({
+          id: event.id,
+          title: event.name,
+          date: event.dateTime,
+          location: event.location,
+          description: event.description,
+          category: 'Event', // Default category since we don't have this field
+          attendees: event.attendees || 0
+        }));
+        setUpcomingEvents(transformedEvents);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
+  // Fetch user's registered events
+  const fetchUserEvents = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+
+      const response = await fetch('http://localhost:5000/events/user-events', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success) {
+        // Transform events to match the expected format
+        const transformedEvents = data.events.map(event => ({
+          id: event.id,
+          title: event.name,
+          date: event.dateTime,
+          location: event.location,
+          description: event.description,
+          category: 'Event', // Default category since we don't have this field
+          status: event.registrationStatus,
+          verificationCode: event.verificationCode
+        }));
+        setRegisteredEvents(transformedEvents);
+      }
+    } catch (error) {
+      console.error('Error fetching user events:', error);
+    }
+  };
+
   useEffect(() => {
     const fetchCurrentUser = async () => {
       try {
@@ -152,7 +194,27 @@ export default function UserDashboard() {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/admin/adminData', {
+        // First get user data to determine role
+        const userResponse = await fetch('http://localhost:5000/users/user', {
+          method: "GET",
+          headers: {
+            'Content-Type': "application/json",
+            'authorization': `Bearer ${token}`
+          },
+        });
+
+        if (!userResponse.ok) {
+          throw new Error(`HTTP error! status: ${userResponse.status}`);
+        }
+
+        const userData = await userResponse.json();
+        
+        // Determine the appropriate endpoint based on user role
+        const endpoint = userData.role === 'admin' 
+          ? 'http://localhost:5000/admin/adminData'
+          : 'http://localhost:5000/users/dashboard';
+
+        const response = await fetch(endpoint, {
           method: "GET",
           headers: {
             'Content-Type': "application/json",
@@ -164,8 +226,8 @@ export default function UserDashboard() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const userData = await response.json();
-        // console.log('API Response:', userData);
+        const dashboardData = await response.json();
+        // console.log('API Response:', dashboardData);
         
         // Update user state with fetched data
         setUser({
@@ -174,6 +236,11 @@ export default function UserDashboard() {
           role: userData.role || '',
           mobileNo: userData.mobileNo || ''
         });
+
+
+        // Fetch events after user data is loaded
+        await fetchAllEvents();
+        await fetchUserEvents();
 
         // console.log('User state will be updated to:', {
         //   name: userData.name || '',
@@ -281,13 +348,86 @@ export default function UserDashboard() {
   const handleRegister = async () => {
     try {
       setRegisterLoading(true);
-      // Simulate API call delay - replace with actual registration logic
-      // await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Add success animation or notification here
-      setIsRegisterOpen(false);
+      // Check if event is selected
+      if (!selectedEvent || !selectedEvent.id) {
+        setErrors({ general: 'No event selected. Please try again.' });
+        setIsRegisterOpen(false);
+        return;
+      }
+
+      // Get token from localStorage
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setErrors({ general: 'Authentication required. Please login again.' });
+        setIsRegisterOpen(false);
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
+        return;
+      }
+
+      // Call registration API
+      const response = await fetch('http://localhost:5000/registrations/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          eventId: selectedEvent.id
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        // Handle error response
+        if (data.error && data.error.includes('already registered')) {
+          // User already registered - show existing registration info
+          if (data.registration && data.registration.verificationCode) {
+            // Redirect to QR code page with existing verification code
+            setIsRegisterOpen(false);
+            setErrors({ success: 'You are already registered for this event!' });
+            // Redirect to QR code page
+            if (typeof window !== 'undefined') {
+              window.location.href = `/qr/${data.registration.verificationCode}`;
+            }
+            return;
+          }
+          setErrors({ general: data.error || 'You are already registered for this event.' });
+        } else {
+          setErrors({ general: data.error || 'Failed to register for event. Please try again.' });
+        }
+        setIsRegisterOpen(false);
+        return;
+      }
+
+      // Success - registration created
+      if (data.registration && data.registration.verificationCode) {
+        setIsRegisterOpen(false);
+        setErrors({ success: 'Successfully registered for the event!' });
+        
+        // Refresh registered events list
+        await fetchUserEvents();
+        
+        // Redirect to QR code page after a short delay
+        setTimeout(() => {
+          if (typeof window !== 'undefined') {
+            window.location.href = `/qr/${data.registration.verificationCode}`;
+          }
+        }, 1500);
+      } else {
+        setErrors({ general: 'Registration successful but verification code not received.' });
+        setIsRegisterOpen(false);
+        // Still refresh events list
+        await fetchUserEvents();
+      }
+
     } catch (error) {
       console.error('Registration failed:', error);
+      setErrors({ general: 'Network error. Please check your connection and try again.' });
+      setIsRegisterOpen(false);
     } finally {
       setRegisterLoading(false);
     }
@@ -409,6 +549,15 @@ export default function UserDashboard() {
                 <Button 
                   size="sm" 
                   variant="outline" 
+                  onClick={() => router.push('/organizedEvents')}
+                  className="border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300 hover:scale-105 min-w-[40px] sm:min-w-auto"
+                >
+                  <FolderKanban className="w-4 h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">My Events</span>
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="outline" 
                   onClick={handleAccountClick}
                   disabled={accountLoading}
                   className="border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300 hover:scale-105 min-w-[40px] sm:min-w-auto disabled:opacity-50 disabled:cursor-not-allowed"
@@ -438,62 +587,6 @@ export default function UserDashboard() {
             </div>
           </div>
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8 sm:mb-12">
-            <Card className="border-none bg-gradient-to-r from-rose-900 to-purple-900 backdrop-blur-xl hover:scale-105 transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white/80 text-sm font-medium">Total Events</p>
-                    <p className="text-3xl font-bold text-white">
-                      {isSubLoading ? <SmallLoader /> : upcomingEvents.length}
-                    </p>
-                  </div>
-                  <Calendar className="w-8 h-8 text-pink-400" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="border-none bg-gradient-to-r from-red-500 to-purple-900 backdrop-blur-xl hover:scale-105 transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white/80 text-sm font-medium">Registered</p>
-                    <p className="text-3xl font-bold text-white">
-                      {isSubLoading ? <SmallLoader /> : registeredEvents.length}
-                    </p>
-                  </div>
-                  <CheckCircle className="w-8 h-8 text-blue-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none bg-gradient-to-r from-pink-600 to-purple-900 backdrop-blur-xl hover:scale-105 transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white/80 text-sm font-medium">This Month</p>
-                    <p className="text-3xl font-bold text-white">2</p>
-                  </div>
-                  <Clock className="w-8 h-8 text-green-400" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-none bg-gradient-to-r from-slate-500 to-purple-900 backdrop-blur-xl hover:scale-105 transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-white/80 text-sm font-medium">Member Since</p>
-                    <p className="text-lg font-bold text-white">
-                      {isSubLoading ? <SmallLoader /> : '2024'}
-                    </p>
-                  </div>
-                  <Sparkles className="w-8 h-8 text-violet-400" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Events Content */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 sm:gap-8">
@@ -564,7 +657,7 @@ export default function UserDashboard() {
                       </div>
                     </div>
                   ))}
-                  {isSubLoading ? (
+                  {eventsLoading || isSubLoading ? (
                     <div className="text-center py-12">
                       <SmallLoader />
                       <p className="text-white/50 mt-4">Loading events...</p>
@@ -622,7 +715,7 @@ export default function UserDashboard() {
                             <span className="text-green-400 text-sm font-medium">Registration Confirmed</span>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 flex-col sm:flex-row">
                           <Button 
                             variant="outline" 
                             onClick={() => openDetails(ev)}
@@ -631,11 +724,24 @@ export default function UserDashboard() {
                             <Eye className="w-4 h-4 mr-2" />
                             Details
                           </Button>
+                          {ev.verificationCode && (
+                            <Button 
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedVerificationCode(ev.verificationCode);
+                                setIsQRCodeOpen(true);
+                              }}
+                              className="border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300 hover:scale-105"
+                            >
+                              <QrCode className="w-4 h-4 mr-2" />
+                              Show QR Code
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
                   ))}
-                  {isSubLoading ? (
+                  {eventsLoading || isSubLoading ? (
                     <div className="text-center py-12">
                       <SmallLoader />
                       <p className="text-white/50 mt-4">Loading your events...</p>
@@ -752,6 +858,41 @@ export default function UserDashboard() {
                   variant="outline" 
                   onClick={() => setIsDetailsOpen(false)}
                   className="border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300"
+                >
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* QR Code Dialog */}
+          <Dialog open={isQRCodeOpen} onOpenChange={setIsQRCodeOpen}>
+            <DialogContent className="border-white/20 bg-slate-900/95 backdrop-blur-xl text-white max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+                  Your Event QR Code
+                </DialogTitle>
+                <DialogDescription className="text-white/60">
+                  Show this QR code at the event entrance for attendance
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4">
+                {selectedVerificationCode && (
+                  <div className="flex flex-col items-center space-y-4">
+                    <div className="bg-white p-6 rounded-xl shadow-2xl">
+                      <QRCodeSVG value={selectedVerificationCode} size={256} level="M" />
+                    </div>
+                    <div className="text-center text-sm text-white/50 mt-4">
+                      <p>Keep this QR code accessible for event check-in</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setIsQRCodeOpen(false)}
+                  className="border-white/20 bg-white/10 hover:bg-white/20 text-white backdrop-blur-xl transition-all duration-300 w-full"
                 >
                   Close
                 </Button>
