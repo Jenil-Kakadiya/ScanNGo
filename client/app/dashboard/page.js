@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -468,6 +468,12 @@ export default function UserDashboard() {
     </div>
   );
 
+  const filteredUpcomingEvents = useMemo(() => {
+    if (!registeredEvents.length) return upcomingEvents;
+    const registeredIds = new Set(registeredEvents.map((event) => event.id));
+    return upcomingEvents.filter((event) => !registeredIds.has(event.id));
+  }, [upcomingEvents, registeredEvents]);
+
   // Show loading state until client-side hydration is complete
   if (!isClient) {
     return (
@@ -605,7 +611,7 @@ export default function UserDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingEvents.map((ev) => (
+                  {filteredUpcomingEvents.map((ev) => (
                     <div key={ev.id} className="group p-6 border border-white/10 rounded-2xl bg-gradient-to-br from-white/5 to-white/10 backdrop-blur-xl hover:border-pink-500/30 hover:shadow-xl hover:shadow-pink-500/10 transition-all duration-300 hover:scale-[1.02]">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div className="flex-1">
@@ -662,7 +668,7 @@ export default function UserDashboard() {
                       <SmallLoader />
                       <p className="text-white/50 mt-4">Loading events...</p>
                     </div>
-                  ) : upcomingEvents.length === 0 ? (
+                  ) : filteredUpcomingEvents.length === 0 ? (
                     <div className="text-center py-12">
                       <Calendar className="w-16 h-16 text-white/30 mx-auto mb-4" />
                       <p className="text-white/50">No upcoming events at the moment.</p>
