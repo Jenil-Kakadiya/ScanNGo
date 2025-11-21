@@ -58,7 +58,7 @@ export default function AdminDashboard() {
         return;
       }
       try {
-        const response = await fetch('http://localhost:5000/admin/adminData', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/adminData`, {
           method: "GET",
           headers: {
             'Content-Type': "application/json",
@@ -103,7 +103,7 @@ export default function AdminDashboard() {
     try {
       setEventsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/admin/events', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +131,7 @@ export default function AdminDashboard() {
     try {
       setDaysLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${eventId}/days`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -159,7 +159,7 @@ export default function AdminDashboard() {
     try {
       setSessionsLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days/${dayId}/sessions`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${eventId}/days/${dayId}/sessions`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
     try {
       setEligibleLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/certificate/eligible-users`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${eventId}/certificate/eligible-users`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
     try {
       setAttendeesLoading(true);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/days/${dayId}/sessions/${sessionId}/attendees`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${eventId}/days/${dayId}/sessions/${sessionId}/attendees`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -244,7 +244,7 @@ export default function AdminDashboard() {
       setDelegatesLoading(true);
       setDelegatesError(null);
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${eventId}/delegates`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${eventId}/delegates`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -314,7 +314,7 @@ export default function AdminDashboard() {
       setAttendanceExportError(null);
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`http://localhost:5000/admin/events/${selectedEvent.id}/attendance/export`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/${selectedEvent.id}/attendance/export`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -418,7 +418,7 @@ export default function AdminDashboard() {
       }
 
       const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/admin/events/create', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/events/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', authorization: `Bearer ${token}` },
         body: JSON.stringify(eventForm)

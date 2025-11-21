@@ -5,7 +5,7 @@ import { Search, Plus, Calendar, MapPin, User, Clock, Eye, Edit, Trash2, AlertCi
 import { useRouter } from 'next/navigation';
 
 // API base URL
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}`;
 
 const EventsManagementPage = () => {
   const [events, setEvents] = useState([]);
@@ -170,7 +170,7 @@ const EventsManagementPage = () => {
         return;
       }
       try {
-        const response = await fetch('http://localhost:5000/admin/adminData', {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/adminData`, {
           method: "GET",
           headers: {
             'Content-Type': "application/json",

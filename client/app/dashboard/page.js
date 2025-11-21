@@ -105,7 +105,7 @@ export default function UserDashboard() {
   const fetchAllEvents = async () => {
     try {
       setEventsLoading(true);
-      const response = await fetch('http://localhost:5000/events/public', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/public`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ export default function UserDashboard() {
       const token = localStorage.getItem('token');
       if (!token) return;
 
-      const response = await fetch('http://localhost:5000/events/user-events', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/user-events`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -195,7 +195,7 @@ export default function UserDashboard() {
         }
 
         // First get user data to determine role
-        const userResponse = await fetch('http://localhost:5000/users/user', {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/users/user`, {
           method: "GET",
           headers: {
             'Content-Type': "application/json",
@@ -211,8 +211,8 @@ export default function UserDashboard() {
         
         // Determine the appropriate endpoint based on user role
         const endpoint = userData.role === 'admin' 
-          ? 'http://localhost:5000/admin/adminData'
-          : 'http://localhost:5000/users/dashboard';
+          ? `${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/adminData`
+          : `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/dashboard`;
 
         const response = await fetch(endpoint, {
           method: "GET",
@@ -368,7 +368,7 @@ export default function UserDashboard() {
       }
 
       // Call registration API
-      const response = await fetch('http://localhost:5000/registrations/register', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/registrations/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

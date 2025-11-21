@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Search, UserX, CheckCircle2, Users, Ban, ShieldAlert, X, Loader2, LayoutDashboard } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
-const API_BASE_URL = 'http://localhost:5000';
+const API_BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}`;
 
 const AdminUsersPage = () => {
   const router = useRouter();

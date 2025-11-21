@@ -81,7 +81,7 @@ export default function OrganizedEventsPage() {
           return;
         }
 
-        const userResponse = await fetch('http://localhost:5000/users/user', {
+        const userResponse = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/users/user`, {
           method: "GET",
           headers: {
             'Content-Type': "application/json",
@@ -172,7 +172,7 @@ export default function OrganizedEventsPage() {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/events/organized', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/organized`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -306,7 +306,7 @@ export default function OrganizedEventsPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/events/${eventId}/sessions`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/${eventId}/sessions`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -349,7 +349,7 @@ export default function OrganizedEventsPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/registrations/attendance/mark`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/registrations/attendance/mark`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -513,7 +513,7 @@ export default function OrganizedEventsPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/events/${selectedEventForDelegate.id}/delegates`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/${selectedEventForDelegate.id}/delegates`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -568,7 +568,7 @@ export default function OrganizedEventsPage() {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/events/${eventId}/complete`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/events/${eventId}/complete`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

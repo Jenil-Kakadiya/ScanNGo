@@ -100,7 +100,6 @@ router.post('/login', async (req, res) => {
 // Get all users
 router.get('/allUsers', authenticateAdminToken,  async (req, res) => {
   try {
-    // console.log("----")
     const user = await User.findAll({
       row: true
     });

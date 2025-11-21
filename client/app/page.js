@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Head from "next/head";
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -129,15 +130,15 @@ export default function AuthPage() {
       // console.log(isUserLogin)
       if (isAdminMode) {
         // Admin login
-        endpoint = 'http://localhost:5000/admin/login';
+        endpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/admin/login`;
         payload = { email: formData.email, password: formData.password };
       } else if (isUserLogin) {
         // User login
-        endpoint = 'http://localhost:5000/users/login';
+        endpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/login`;
         payload = { email: formData.email, password: formData.password };
       } else {
         // User registration
-        endpoint = 'http://localhost:5000/users/register';
+        endpoint = `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/register`;
 
         // console.log(formData);
         payload = { 
@@ -236,7 +237,7 @@ export default function AuthPage() {
   const handleGoogleAuth = () => {
     setIsGoogleLoading(true);
     // Redirect to the Google OAuth endpoint
-    window.location.href = 'http://localhost:5000/users/google';
+    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/users/google`;
   };
 
   // Show redirecting overlay

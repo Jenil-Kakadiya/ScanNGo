@@ -93,7 +93,7 @@ router.get('/user-events', authenticateToken, async (req, res) => {
             raw: true
         });
 
-        console.log('Registrations:', registrations);
+        // console.log('Registrations:', registrations);
 
         // Extract eventIds from registrations
         const eventIds = registrations.map(reg => reg.eventId);
