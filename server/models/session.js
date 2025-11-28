@@ -1,41 +1,24 @@
-module.exports = (sequelize, DataTypes) => {
-  const Session = sequelize.define('Session', {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    eventDayId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    title: {
-      type: DataTypes.STRING(255),
-      allowNull: false
-    }
-  }, {
-    timestamps: true,
-    tableName: 'sessions'
-  });
+const mongoose = require('mongoose');
 
-  Session.associate = (models) => {
-    Session.belongsTo(models.EventDay, { foreignKey: 'eventDayId', as: 'EventDay' });
-    Session.hasMany(models.Attendance, { foreignKey: 'sessionId', as: 'Attendances' });
-  };
+const sessionSchema = new mongoose.Schema(
+  {
+    eventDayId: { type: mongoose.Schema.Types.ObjectId, ref: 'EventDay', required: true },
+    title: { type: String, required: true, trim: true },
+  },
+  { timestamps: true }
+);
 
-  return Session;
-};
+sessionSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
 
-
-
-
-
-
-
-
-
-
-
+module.exports = mongoose.models.Session || mongoose.model('Session', sessionSchema);
 
 
 

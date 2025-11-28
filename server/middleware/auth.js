@@ -4,33 +4,33 @@ const { User, Admin } = require('../models');
 const authenticateToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
         error: 'Access denied',
-        message: 'No token provided'
+        message: 'No token provided',
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
     
-    // Get user from database to ensure they still exist and are active
-    const user = await User.findByPk(decoded.userId);
-    
-    if (!user) {
+    // Handle both ObjectId string and regular string
+    const userId = decoded.userId;
+    const user = await User.findById(userId);
+
+    if (!user || user.isActive === false) {
       return res.status(401).json({
         error: 'Access denied',
-        message: 'User not found or account disabled'
+        message: 'User not found or account disabled',
       });
     }
 
-    // Add user info to request object
     req.user = {
-      id: user.id,
-      email: user.email,
+      id: user._id.toString(),
+      email: user.personalEmail,
       role: user.role,
-      name: user.name
+      name: user.name,
     };
 
     next();
@@ -38,21 +38,21 @@ const authenticateToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         error: 'Invalid token',
-        message: 'Token is not valid'
+        message: 'Token is not valid',
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'Token expired',
-        message: 'Token has expired, please login again'
+        message: 'Token has expired, please login again',
       });
     }
 
     console.error('Auth middleware error:', error);
     res.status(500).json({
       error: 'Authentication failed',
-      message: 'Internal server error'
+      message: 'Internal server error',
     });
   }
 };
@@ -60,33 +60,33 @@ const authenticateToken = async (req, res, next) => {
 const authenticateAdminToken = async (req, res, next) => {
   try {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    const token = authHeader && authHeader.split(' ')[1];
 
     if (!token) {
       return res.status(401).json({
         error: 'Access denied',
-        message: 'No token provided'
+        message: 'No token provided',
       });
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
     
-    // Get user from database to ensure they still exist and are active
-    const admin = await Admin.findByPk(decoded.userId);
-    
+    // Handle both ObjectId string and regular string
+    const adminId = decoded.userId;
+    const admin = await Admin.findById(adminId);
+
     if (!admin) {
       return res.status(401).json({
         error: 'Access denied',
-        message: 'User not found or account disabled'
+        message: 'Admin not found or account disabled',
       });
     }
 
-    // Add user info to request object
     req.user = {
-      id: admin.id,
+      id: admin._id.toString(),
       email: admin.email,
       role: admin.role,
-      name: admin.name
+      name: admin.name,
     };
 
     next();
@@ -94,21 +94,21 @@ const authenticateAdminToken = async (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         error: 'Invalid token',
-        message: 'Token is not valid'
+        message: 'Token is not valid',
       });
     }
-    
+
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         error: 'Token expired',
-        message: 'Token has expired, please login again'
+        message: 'Token has expired, please login again',
       });
     }
 
     console.error('Auth middleware error:', error);
     res.status(500).json({
       error: 'Authentication failed',
-      message: 'Internal server error'
+      message: 'Internal server error',
     });
   }
 };
@@ -127,7 +127,7 @@ const requireAdmin = (req, res, next) => {
 
 // Middleware to check if user is admin or the owner of the resource
 const requireAdminOrOwner = (req, res, next) => {
-  if (req.user && (req.user.role === 'admin' || req.user.id === parseInt(req.params.id))) {
+  if (req.user && (req.user.role === 'admin' || req.user.id === req.params.id)) {
     next();
   } else {
     res.status(403).json({

@@ -1,44 +1,28 @@
-module.exports = (sequelize, DataTypes) => {
-  const EventCertificateRequirement = sequelize.define('EventCertificateRequirement', {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    eventId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    sessionId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    }
-  }, {
-    timestamps: true,
-    tableName: 'event_certificate_requirements',
-    indexes: [
-      {
-        unique: true,
-        fields: ['eventId', 'sessionId']
-      }
-    ]
-  });
+const mongoose = require('mongoose');
 
-  EventCertificateRequirement.associate = (models) => {
-    EventCertificateRequirement.belongsTo(models.Event, { foreignKey: 'eventId', as: 'Event' });
-    EventCertificateRequirement.belongsTo(models.Session, { foreignKey: 'sessionId', as: 'Session' });
-  };
+const eventCertificateRequirementSchema = new mongoose.Schema(
+  {
+    eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+    sessionId: { type: mongoose.Schema.Types.ObjectId, ref: 'Session', required: true },
+  },
+  { timestamps: true }
+);
 
-  return EventCertificateRequirement;
-};
+eventCertificateRequirementSchema.index({ eventId: 1, sessionId: 1 }, { unique: true });
 
+eventCertificateRequirementSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
 
-
-
-
-
-
-
+module.exports =
+  mongoose.models.EventCertificateRequirement ||
+  mongoose.model('EventCertificateRequirement', eventCertificateRequirementSchema);
 
 
 

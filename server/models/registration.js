@@ -1,47 +1,29 @@
-module.exports = (sequelize, DataTypes) => {
-  const Registration = sequelize.define('Registration', {
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    eventId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    userId: {
-      type: DataTypes.INTEGER,
-      allowNull: false
-    },
-    status: {
-      type: DataTypes.ENUM('pending', 'confirmed', 'cancelled'),
-      defaultValue: 'confirmed'
-    },
-    verificationCode: {
-      type: DataTypes.STRING(32),
-      allowNull: false,
-      unique: true
-    },
-    checkedIn: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    }
-  }, {
-    timestamps: true,
-    tableName: 'registrations',
-    indexes: [
-      {
-        unique: true,
-        fields: ['eventId', 'userId']
-      }
-    ]
-  });
+const mongoose = require('mongoose');
 
-  Registration.associate = (models) => {
-    Registration.belongsTo(models.Event, { foreignKey: 'eventId', as: 'Event' });
-    Registration.belongsTo(models.User, { foreignKey: 'userId', as: 'User' });
-    Registration.hasMany(models.Attendance, { foreignKey: 'registrationId', as: 'Attendances' });
-  };
+const registrationSchema = new mongoose.Schema(
+  {
+    eventId: { type: mongoose.Schema.Types.ObjectId, ref: 'Event', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'confirmed' },
+    verificationCode: { type: String, required: true, unique: true },
+    checkedIn: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
 
-  return Registration;
-};
+registrationSchema.index({ eventId: 1, userId: 1 }, { unique: true });
+
+registrationSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+module.exports = mongoose.models.Registration || mongoose.model('Registration', registrationSchema);
+
+
+

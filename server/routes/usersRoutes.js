@@ -1,53 +1,49 @@
 const express = require('express');
-const { User, Registration, Event } = require('../models');
-const { authenticateToken, authenticateAdminToken } = require('../middleware/auth');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const passport = require("passport");
-const GoogleStrategy = require("passport-google-oauth20").Strategy;
+const passport = require('passport');
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+
+const { User, Registration, Event } = require('../models');
+const { authenticateToken, authenticateAdminToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-
-router.get('/user', authenticateToken,  async (req, res) => {
+router.get('/user', authenticateToken, async (req, res) => {
   try {
-    // console.log("----")
-    const user = await User.findByPk(req.user.id, {
-      row: true
-    });
+    const user = await User.findById(req.user.id).lean();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     res.json({
-        email : user.personalEmail,
-        name: user.name,
-        mobileNo: user.mobileNo,
-        role: user.role
+      email: user.personalEmail,
+      name: user.name,
+      mobileNo: user.mobileNo,
+      role: user.role,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 });
 
-// Get user dashboard data with stats
 router.get('/dashboard', authenticateToken, async (req, res) => {
   try {
-    const user = await User.findByPk(req.user.id);
-    
-    // Get user's registration count
-    const userRegistrations = await Registration.count({ 
-      where: { userId: req.user.id } 
-    });
-    
-    // Get user's attended events count
-    const attendedEvents = await Registration.count({ 
-      where: { 
-        userId: req.user.id,
-        checkedIn: true 
-      } 
-    });
+    const userPromise = User.findById(req.user.id).lean();
+    const registrationsPromise = Registration.countDocuments({ userId: req.user.id });
+    const attendedPromise = Registration.countDocuments({ userId: req.user.id, checkedIn: true });
+    const activeEventsPromise = Event.countDocuments({ status: 'active' });
 
-    // Get total active events (for reference)
-    const totalActiveEvents = await Event.count({ 
-      where: { status: 'active' } 
-    });
+    const [user, totalRegistrations, attendedEvents, totalActiveEvents] = await Promise.all([
+      userPromise,
+      registrationsPromise,
+      attendedPromise,
+      activeEventsPromise,
+    ]);
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
     res.json({
       email: user.personalEmail,
@@ -57,11 +53,11 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       stats: {
         totalEvents: totalActiveEvents,
         activeEvents: totalActiveEvents,
-        totalRegistrations: userRegistrations,
-        attendedEvents: attendedEvents,
-        totalUsers: 0, // Not relevant for regular users
-        activeUsers: 0 // Not relevant for regular users
-      }
+        totalRegistrations,
+        attendedEvents,
+        totalUsers: 0,
+        activeUsers: 0,
+      },
     });
   } catch (error) {
     console.error('User dashboard data error:', error);
@@ -71,63 +67,64 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 
 router.post('/register', async (req, res) => {
   try {
-    console.log(req.body)
-    const { name, email, mobileNo, password, role = 'user'} = req.body;
+    const { name, email, mobileNo, password, role = 'user' } = req.body;
 
-    if (!name || !email || !mobileNo || !password ) {
-      return res.status(400).json({ 
+    if (!name || !email || !mobileNo || !password) {
+      return res.status(400).json({
         success: false,
-        error: 'All fields are required' 
+        error: 'All fields are required',
       });
     }
-    // console.log("-------0")
-    const existingUser = await User.findOne({ where: { personalEmail : email } });
-    // console.log(existingUser)
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedMobile = mobileNo.trim();
+
+    const [existingUser, existingUserByMobile] = await Promise.all([
+      User.findOne({ personalEmail: normalizedEmail }),
+      User.findOne({ mobileNo: normalizedMobile }),
+    ]);
+
     if (existingUser) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Email already exists' 
+        error: 'Email already exists',
       });
     }
-    // console.log("-------1")
-    const existingUserByMobile = await User.findOne({ where: { mobileNo } });
+
     if (existingUserByMobile) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Mobile number already exists' 
+        error: 'Mobile number already exists',
       });
     }
-    console.log("-------2")
-    // Password will be hashed automatically by User model's beforeCreate hook
-    
-    const user = await User.create({ 
-      name, 
-      personalEmail : email, 
-      mobileNo,
-      universityEmail : '',
-      password: password, // Pass plain password, hook will hash it
+
+    const user = await User.create({
+      name: name.trim(),
+      personalEmail: normalizedEmail,
+      mobileNo: normalizedMobile,
+      universityEmail: '',
+      password,
       batch: '2022-2026',
       role,
-      isActive: 1 
+      isActive: true,
     });
-    // console.log("-------3")
+
     const token = jwt.sign(
-      { userId: user.id, email: user.personalEmail, role: user.role }, 
-      process.env.JWT_SECRET || 'fallback_secret', 
+      { userId: user._id.toString(), email: user.personalEmail, role: user.role },
+      process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
 
-    res.status(201).json({ 
+    res.status(201).json({
       success: true,
       message: 'User registered successfully',
-      user: user.toJSON(), 
-      token 
+      user: user.toJSON(),
+      token,
     });
-
   } catch (error) {
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message 
+      error: error.message,
     });
   }
 });
@@ -135,185 +132,148 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // Trim whitespace and validate
-    const trimmedEmail = email?.trim();
+
+    const trimmedEmail = email?.trim().toLowerCase();
     const trimmedPassword = password?.trim();
-    
+
     if (!trimmedEmail || !trimmedPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Email and password are required' 
+        error: 'Email and password are required',
       });
     }
 
-    const user = await User.findOne({ 
-      where: { 
-        personalEmail: trimmedEmail.toLowerCase(), 
-        isActive: 1 
-      } 
-    });
-    
+    const user = await User.findOne({
+      personalEmail: trimmedEmail,
+      isActive: true,
+    }).select('+password');
+
     if (!user) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'User not found' 
+        error: 'User not found',
       });
     }
-    
-    // Check if password field exists
-    if (!user.password) {
-      return res.status(500).json({ 
-        success: false,
-        error: 'Password field not found in user record' 
-      });
-    }
-    
-    // Compare passwords using the model method or bcrypt directly
+
     const isPasswordCorrect = await bcrypt.compare(trimmedPassword, user.password);
-    
+
     if (!isPasswordCorrect) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        error: 'Invalid password' 
+        error: 'Invalid password',
       });
     }
-    
+
     const token = jwt.sign(
-      { userId: user.id, email: user.personalEmail, role: user.role }, 
-      process.env.JWT_SECRET || 'fallback_secret', 
+      { userId: user._id.toString(), email: user.personalEmail, role: user.role },
+      process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
     );
-    
-    res.status(200).json({ 
+
+    res.status(200).json({
       success: true,
       message: 'Login successful',
-      user: user.toJSON(), 
-      token 
+      user: user.toJSON(),
+      token,
     });
-
   } catch (error) {
     console.log(error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: error.message 
+      error: error.message,
     });
   }
 });
 
-
 router.get('/get-email', authenticateToken, async (req, res) => {
-
-  let userId = req.user.id
-  const user = await User.findByPk(userId);
+  const user = await User.findById(req.user.id).lean();
+  if (!user) {
+    return res.status(404).json({ success: false, error: 'User not found' });
+  }
 
   res.status(202).json({
-    success:true,
-    email: user.personalEmail
+    success: true,
+    email: user.personalEmail,
   });
 });
 
-// router.post('/change-email',authMiddleware, async (req, res) => {
-
-//   let userId = req.user.id
-//   const user = await User.findByPk(userId);
-
-//   await user.update({email:req.body.email})
-  
-//   res.status(202).json({
-//     success:true
-//   });
-// });
-
-// Function to find or create user for Google OAuth
 async function findOrCreateUser(email, name) {
-  try {
-    // First, try to find existing user by email
-    let user = await User.findOne({ where: { personalEmail: email } });
-    
-    if (user) {
-      // User exists, update last login time
-      // await user.update({ lastlogin: new Date() });
-      return user;
-    }
-    
-    // User doesn't exist, create new user
-    // For Google OAuth users, we need to provide a password and mobileNo due to allowNull: false
-    // but they won't be used since authType is 'google'
-    user = await User.create({
-      name: name,
-      personalEmail: email,
-      role: 'user',
-      password: 'google_oauth_user', // Placeholder password, won't be used
-      mobileNo: '9999999999',
-      isActive: 1 // Placeholder mobile number, won't be used
-    });
+  const normalizedEmail = email.toLowerCase();
+  let user = await User.findOne({ personalEmail: normalizedEmail });
 
+  if (user) {
     return user;
-  } catch (error) {
-    console.error('Error in findOrCreateUser:', error);
-    throw error;
   }
+
+  user = await User.create({
+    name: name || 'Google User',
+    personalEmail: normalizedEmail,
+    role: 'user',
+    password: `google_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    mobileNo: `9${Math.floor(100000000 + Math.random() * 900000000)}`,
+    isActive: true,
+  });
+
+  return user;
 }
 
-
-
-// Passport Strategy
-passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: `${process.env.GOOGLE_REDIRECT_URL}`
-},
-  async (accessToken, refreshToken, profile, done) => {
-    try {
-      const email = profile.emails[0].value;
-      const name = profile.displayName;
-
-      // Lookup or create user in database
-      const user = await findOrCreateUser(email, name);
-      done(null, user);
-    } catch (error) {
-      console.error('Google OAuth error:', error);
-      done(error, null);
+passport.use(
+  new GoogleStrategy(
+    {
+      clientID: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+      callbackURL: `${process.env.GOOGLE_REDIRECT_URL}`,
+    },
+    async (accessToken, refreshToken, profile, done) => {
+      try {
+        const email = profile.emails[0].value;
+        const name = profile.displayName;
+        const user = await findOrCreateUser(email, name);
+        done(null, user);
+      } catch (error) {
+        console.error('Google OAuth error:', error);
+        done(error, null);
+      }
     }
-  }
-));
+  )
+);
 
 passport.serializeUser((user, done) => {
-  done(null, user.id);
+  done(null, user._id.toString());
 });
 
 passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findByPk(id);
+    const user = await User.findById(id);
     done(null, user);
   } catch (error) {
     done(error, null);
   }
 });
 
-router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
 
-router.get("/google/callback",
-  passport.authenticate("google", { session: false, failureRedirect: "/login" }),
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
   (req, res) => {
     try {
       const user = req.user;
       const token = jwt.sign(
-        { userId: user.id, email: user.personalEmail, role: user.role }, 
-        process.env.JWT_SECRET || 'fallback_secret', 
+        { userId: user._id.toString(), email: user.personalEmail, role: user.role },
+        process.env.JWT_SECRET || 'fallback_secret',
         { expiresIn: process.env.JWT_EXPIRES_IN || '24h' }
       );
 
-      // 🔁 Redirect back to frontend with token and user data
-      const userData = encodeURIComponent(JSON.stringify({
-        id: user.id,
-        name: user.name,
-        email: user.personalEmail,
-        role: user.role
-      }));
-      
-      // Use hardcoded frontend URL for now (you can set this as env variable later)
+      const userData = encodeURIComponent(
+        JSON.stringify({
+          id: user._id.toString(),
+          name: user.name,
+          email: user.personalEmail,
+          role: user.role,
+        })
+      );
+
       const frontendUrl = process.env.FRONTEND_URL;
       res.redirect(`${frontendUrl}/dashboard/?token=${token}&user=${userData}`);
     } catch (error) {
@@ -324,98 +284,54 @@ router.get("/google/callback",
   }
 );
 
-// router.get('/me', authenticateToken, async (req, res) => {
-//   try {
-//     const user = await User.findByPk(req.user.id);
-//     res.json({ user: user.toJSON() });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Get user by ID
-// router.get('/:id', async (req, res) => {
-//   try {
-//     const user = await User.findByPk(req.params.id);
-//     if (!user) return res.status(404).json({ error: 'User not found' });
-//     res.json({ user: user.toJSON() });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Update user
-// router.put('/:id', async (req, res) => {
-//   try {
-//     const user = await User.findByPk(req.params.id);
-//     if (!user) return res.status(404).json({ error: 'User not found' });
-    
-//     await user.update(req.body);
-//     res.json({ message: 'User updated', user: user.toJSON() });
-//   } catch (error) {
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// // Delete user (soft delete)
-// router.delete('/:id', async (req, res) => {
-//   try {
-//     const user = await User.findByPk(req.params.id);
-//     res.status(500).json({ error: error.message });
-//   }
-// });
-
-// Admin: Get all users with registration stats and details
 router.get('/', authenticateAdminToken, async (req, res) => {
   try {
-    const users = await User.findAll({
-      include: [
-        {
-          model: Registration,
-          as: 'Registrations',
-          attributes: ['id', 'eventId', 'status', 'checkedIn', 'createdAt'],
-          include: [
-            {
-              model: Event,
-              as: 'Event',
-              attributes: ['id', 'name', 'status', 'dateTime', 'location']
-            }
-          ]
-        }
-      ],
-      order: [['createdAt', 'DESC']]
-    });
+    const users = await User.find().lean();
+    const registrations = await Registration.find({
+      userId: { $in: users.map((u) => u._id) },
+    })
+      .populate('eventId', 'name status dateTime location')
+      .lean();
 
-    const result = users.map((u) => {
-      const regs = Array.isArray(u.Registrations) ? u.Registrations : [];
-      const registrationsCount = regs.length;
-      const attendedCount = regs.filter(r => r.checkedIn === true).length;
-      const activeRegistrationsCount = regs.filter(r => r.status === 'confirmed').length;
+    const registrationsByUser = registrations.reduce((acc, reg) => {
+      const key = reg.userId.toString();
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(reg);
+      return acc;
+    }, {});
+
+    const result = users.map((user) => {
+      const regs = registrationsByUser[user._id.toString()] || [];
+      const attendedCount = regs.filter((r) => r.checkedIn).length;
+      const activeRegistrationsCount = regs.filter((r) => r.status === 'confirmed').length;
+
       return {
-        id: u.id,
-        name: u.name,
-        personalEmail: u.personalEmail,
-        mobileNo: u.mobileNo,
-        department: u.department,
-        batch: u.batch,
-        role: u.role,
-        isActive: u.isActive,
-        registrationsCount,
+        id: user._id.toString(),
+        name: user.name,
+        personalEmail: user.personalEmail,
+        mobileNo: user.mobileNo,
+        department: user.department,
+        batch: user.batch,
+        role: user.role,
+        isActive: user.isActive,
+        registrationsCount: regs.length,
         attendedCount,
         activeRegistrationsCount,
-        registrations: regs.map(r => ({
-          id: r.id,
+        registrations: regs.map((r) => ({
+          id: r._id.toString(),
           status: r.status,
           checkedIn: r.checkedIn,
           createdAt: r.createdAt,
-          event: r.Event ? {
-            id: r.Event.id,
-            name: r.Event.name,
-            status: r.Event.status,
-            dateTime: r.Event.dateTime,
-            location: r.Event.location
-          } : null
-        }))
+          event: r.eventId
+            ? {
+                id: r.eventId._id.toString(),
+                name: r.eventId.name,
+                status: r.eventId.status,
+                dateTime: r.eventId.dateTime,
+                location: r.eventId.location,
+              }
+            : null,
+        })),
       };
     });
 
@@ -426,15 +342,16 @@ router.get('/', authenticateAdminToken, async (req, res) => {
   }
 });
 
-// Admin: Disable a user
 router.put('/:id/disable', authenticateAdminToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const user = await User.findByPk(id);
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ success: false, error: 'User not found' });
     }
-    await user.update({ isActive: 0 });
+    user.isActive = false;
+    await user.save();
+
     res.status(200).json({ success: true, message: 'User disabled successfully' });
   } catch (error) {
     console.error('Error disabling user:', error);
@@ -443,3 +360,4 @@ router.put('/:id/disable', authenticateAdminToken, async (req, res) => {
 });
 
 module.exports = router;
+

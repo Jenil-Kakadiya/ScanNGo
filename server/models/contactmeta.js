@@ -1,27 +1,24 @@
-module.exports = (sequelize, DataTypes) => {
-    const Contactmeta = sequelize.define('Contactmeta', {  // Model name "Contactmeta"
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true
-      },
-      userId: {
-        type: DataTypes.INTEGER,
-        allowNull: false
-      },
-      meta: {
-        type: DataTypes.JSON,
-        allowNull: true
-      }
-    }, {
-      timestamps: true,
-      tableName: 'contactmeta'  // lowercase table
-    });
-  
-    Contactmeta.associate = (models) => {
-      Contactmeta.belongsTo(models.User, { foreignKey: 'userId' });
-    };
-  
-    return Contactmeta;
-  };
-  
+const mongoose = require('mongoose');
+
+const contactMetaSchema = new mongoose.Schema(
+  {
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    meta: { type: mongoose.Schema.Types.Mixed, default: {} },
+  },
+  { timestamps: true }
+);
+
+contactMetaSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+module.exports = mongoose.models.Contactmeta || mongoose.model('Contactmeta', contactMetaSchema);
+
+
+

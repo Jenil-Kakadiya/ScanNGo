@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const app = express();
-const db = require('./models');
+const { connectDB } = require('./models');
 const cors = require('cors');
 const passport = require("passport");
 const session = require("express-session");
@@ -62,10 +62,13 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-db.sequelize.sync({ force: false }).then(() => {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+connectDB()
+  .then(() => {
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error('Failed to connect to database:', err);
+    process.exit(1);
   });
-}).catch(err => {
-  console.error('Failed to sync database:', err);
-});

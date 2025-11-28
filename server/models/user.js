@@ -1,80 +1,42 @@
+const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-module.exports = (sequelize, DataTypes) => {
-  const User = sequelize.define('User', {  // Model name "User"
-    id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
-    },
-    name: { type: DataTypes.STRING, allowNull: false },
-    personalEmail: {
-      type: DataTypes.STRING,
-      unique: true,
-      allowNull: false,
-      validate: { isEmail: true }
-    },
-    universityEmail: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "",
-    },
-    universityRollNo: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "333"
-    },
-    mobileNo: {
-      type: DataTypes.STRING,
-      unique: true,
-      allowNull: false,
-      validate: { isNumeric: true }
-    },
-    department: {
-      type: DataTypes.ENUM('ICT', 'CSE'),
-      allowNull: true,
-      defaultValue: "ICT"
-    },
-    batch: {
-      type: DataTypes.STRING,
-      allowNull: true,
-      defaultValue: "2023-2024",
-      validate: { is: /^\d{4}-\d{4}$/ }
-    },
-    password: { type: DataTypes.STRING, allowNull: false },
-    role: {
-      type: DataTypes.ENUM('user', 'delegate'),
-      allowNull: false,
-      defaultValue: 'user'
-    },
-    isActive: {
-      type: DataTypes.INTEGER(2),
-      allowNull: false,
-      defaultValue: 1
-    }
-  }, {
-    hooks: {
-      beforeCreate: async (user) => {
-        if (user.password) {
-          const salt = await bcrypt.genSalt(10);
-          user.password = await bcrypt.hash(user.password, salt);
-        }
-      }
-    },
-    timestamps: true,
-    tableName: 'users'  // lowercase table
-  });
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
+    personalEmail: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    universityEmail: { type: String, default: '', trim: true },
+    universityRollNo: { type: String, default: '333', trim: true },
+    mobileNo: { type: String, required: true, unique: true, trim: true },
+    department: { type: String, enum: ['ICT', 'CSE'], default: 'ICT' },
+    batch: { type: String, default: '2023-2024' },
+    password: { type: String, required: true },
+    role: { type: String, enum: ['user', 'delegate'], default: 'user' },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
 
-  User.prototype.comparePassword = async function(candidatePassword) {
-    return await bcrypt.compare(candidatePassword, this.password);
-  };
+userSchema.pre('save', async function hashPassword(next) {
+  if (!this.isModified('password')) return next();
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
 
-  User.associate = (models) => {
-    User.hasOne(models.Contactmeta, { foreignKey: 'userId' });
-    User.hasMany(models.Event, { foreignKey: 'organizerId' });
-    User.hasMany(models.Registration, { foreignKey: 'userId' });
-    User.hasMany(models.Attendance, { foreignKey: 'markedBy', as: 'MarkedAttendances' });
-  };
-
-  return User;
+userSchema.methods.comparePassword = function comparePassword(candidatePassword) {
+  return bcrypt.compare(candidatePassword, this.password || '');
 };
+
+userSchema.set('toJSON', {
+  virtuals: true,
+  transform: (_, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    delete ret.password;
+    return ret;
+  },
+});
+
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);

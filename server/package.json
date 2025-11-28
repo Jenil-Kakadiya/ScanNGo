@@ -1,14 +1,14 @@
 {
   "name": "scannngo-server",
   "version": "1.0.0",
-  "description": "ScanNGo Server with MySQL and Sequelize",
+  "description": "ScanNGo Server powered by Express and MongoDB",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "db:migrate": "sequelize-cli db:migrate",
-    "db:seed": "sequelize-cli db:seed:all",
-    "db:reset": "sequelize-cli db:drop && sequelize-cli db:create && sequelize-cli db:migrate"
+    "db:migrate": "echo \"MongoDB migrations handled manually\"",
+    "db:seed": "echo \"MongoDB seed scripts not configured\"",
+    "db:reset": "echo \"Use MongoDB tools to reset database\""
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -18,19 +18,16 @@
     "express-session": "^1.18.2",
     "express-validator": "^7.0.1",
     "jsonwebtoken": "^9.0.2",
-    "mysql2": "^3.6.5",
+    "mongoose": "^8.8.0",
     "passport": "^0.7.0",
-    "passport-google-oauth20": "^2.0.0",
-    "sequelize": "^6.35.0"
+    "passport-google-oauth20": "^2.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "sequelize-cli": "^6.6.2"
+    "nodemon": "^3.0.1"
   },
   "keywords": [
     "express",
-    "mysql",
-    "sequelize",
+    "mongodb",
     "nodejs"
   ],
   "author": "",

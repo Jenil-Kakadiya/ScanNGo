@@ -10,6 +10,7 @@ const API_BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}`;
 const EventsManagementPage = () => {
   const [events, setEvents] = useState([]);
   const [user, setUser] = useState(null);
+  const [users, setUsers] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -47,6 +48,30 @@ const EventsManagementPage = () => {
   });
 
   // API Functions
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`${API_BASE_URL}/admin/allUsers`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      if (data.success && data.users) {
+        setUsers(data.users);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    }
+  };
+
   const fetchEvents = async () => {
     try {
       const token = localStorage.getItem('token');
@@ -208,7 +233,8 @@ const EventsManagementPage = () => {
           creatorEmail: userData.email || ''
         }));
 
-        // Fetch events after successful authentication
+        // Fetch users and events after successful authentication
+        await fetchUsers();
         await fetchEvents();
       } catch (error) {
         console.error('Error parsing user data:', error);
@@ -352,7 +378,7 @@ const EventsManagementPage = () => {
     
     if (!eventForm.name.trim()) newErrors.name = 'Event name is required';
     if (!eventForm.dateTime) newErrors.dateTime = 'Date and time is required';
-    if (!eventForm.organizerId) newErrors.organizerId = 'Organizer ID is required';
+    if (!eventForm.organizerId) newErrors.organizerId = 'Organizer is required';
     if (!eventForm.creatorEmail.trim()) newErrors.creatorEmail = 'Creator email is required';
     else if (!/\S+@\S+\.\S+/.test(eventForm.creatorEmail)) newErrors.creatorEmail = 'Invalid email format';
     
@@ -859,16 +885,21 @@ const EventsManagementPage = () => {
 
                     <div className="space-y-2">
                       <label htmlFor="organizerId" className="text-sm font-medium text-gray-700 block">
-                        Organizer ID *
+                        Organizer *
                       </label>
-                      <input
+                      <select
                         id="organizerId"
-                        type="number"
-                        placeholder="Enter organizer user ID"
                         value={eventForm.organizerId}
                         onChange={(e) => setEventForm({ ...eventForm, organizerId: e.target.value })}
                         className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg transition-all duration-200 hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                      />
+                      >
+                        <option value="">Select an organizer</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name} ({user.email})
+                          </option>
+                        ))}
+                      </select>
                       {errors.organizerId && (
                         <p className="text-red-500 text-sm flex items-start gap-2 mt-1">
                           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" /> 
